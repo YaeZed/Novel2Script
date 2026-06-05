@@ -245,3 +245,42 @@
   - Kept full-document YAML editing/download behavior unchanged.
 - Validation:
   - `npm run build`: passed.
+
+## Session: 2026-06-05 Phase 4 PR6 Execution
+
+### PR6: character extraction + prompt grounding
+- **Status:** complete
+- Actions taken:
+  - Read `planning-with-files` instructions and restored `task_plan.md`, `findings.md`, `progress.md`.
+  - User confirmed PR5 is merged.
+  - Fetched `origin/master`, fast-forwarded local `master` to PR5 merge commit `2badfd1`, and created `codex/phase-4-pr6-character-grounding`.
+  - Inspected the current pipeline, prompt builder, schema, serializers, and tests.
+  - Recorded PR6 scope: deterministic full-text character extraction plus prompt grounding only.
+  - Added `character_extractor.py` for source-derived character evidence from dialogue labels, quoted/prefaced dialogue attribution, narration action hints, and English attribution.
+  - Replaced the inline pipeline extractor and passed the richer character table into both LLM prompts and placeholder conversion.
+  - Tightened placeholder scene building so known metadata labels such as time/place/note stay as action text instead of fake dialogue when a character table exists.
+  - Added prompt grounding rules so model output must stay inside the supplied chapter text and source-derived character table.
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 20 tests.
+  - `npm run build`: first attempt blocked by PowerShell `npm.ps1` execution policy; reran with `npm.cmd` and passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+### PR6 hand-test feedback fix
+- **Status:** complete
+- User browser screenshots showed:
+  - `时间：、地点：、林照：对白` produced `characters: []` and a fake dialogue beat with `character: 时间`.
+  - `“别出声。”沈岚低声说。` extracted `沈岚` but placeholder still rendered the sentence as action.
+- Actions taken:
+  - Added inline speaker extraction after punctuation/metadata labels.
+  - Added placeholder metadata-label rejection even when no character table exists.
+  - Added multi-label placeholder parsing so metadata labels are skipped and real speaker labels can still become dialogue.
+  - Added Chinese attributed quote parsing for placeholder dialogue beats with parenthetical voice hints.
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 24 tests.
+  - Local smoke conversion confirmed the two screenshot samples now generate `character: 林照` and `character: 沈岚`.
+  - `npm.cmd run build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.

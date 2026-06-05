@@ -178,3 +178,24 @@
 - Local `origin/master` after fetch is merge commit `14ca2bf`; its tree matches Phase 2 feature commit `8407950`.
 - Current Phase 3 branch: `codex/phase-3-claude-pipeline`.
 - `backend/README.md` does not exist; project documentation currently lives in root `README.md` and `CODEX.md`.
+
+## 2026-06-05 PR6 Character Grounding Findings
+
+### First-principles framing
+- The user does not need a decorative cast list; the product needs a reliable source-derived identity layer so generated script beats keep character names stable.
+- The shortest useful path is local extraction before model calls: collect character evidence from the whole source, then pass that evidence into each chapter prompt.
+- A full cross-chapter identity resolver is intentionally out of scope. PR6 should improve the signal that already exists in the source without adding a second LLM pipeline.
+
+### Current implementation findings
+- `extract_character_table` lives inside `pipeline.py` and only reads line-start speaker labels matching `Name: dialogue`.
+- `build_chapter_prompt` already includes `Known characters JSON`, but weak extraction means that grounding input is often empty or incomplete.
+- Placeholder conversion currently ignores the character table and treats any colon-like paragraph as dialogue, including possible metadata labels.
+
+### PR6 decision
+- Implement a deterministic extractor first. It supports no-key demo mode, is testable, and avoids making character extraction reliability depend on another provider call.
+- Store only the existing schema fields (`name`, `role`, `description`) for now, with descriptions carrying compact evidence text. This keeps frontend YAML validation unchanged.
+
+### Hand-test feedback
+- A pasted inline sample like `时间：、地点：、林照：对白` exposed that the placeholder scene builder still treated the first colon label as a speaker when the character table was empty.
+- A quoted attribution sample like `“别出声。”沈岚低声说。` proved character extraction worked, but placeholder output stayed as action, which made no-key demo behavior look weaker than the grounding layer.
+- Resolution: detect inline speaker labels after metadata labels, reject metadata labels as speakers even without a character table, split multi-label placeholder paragraphs when a real speaker label appears, and convert Chinese attributed quotes into dialogue beats.

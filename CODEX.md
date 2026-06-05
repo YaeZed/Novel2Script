@@ -1,5 +1,12 @@
 # CODEX Guide
 
+## PR6 Current Rule
+
+- 当前分支：`codex/phase-4-pr6-character-grounding`。
+- 本 PR 只处理角色提取和 prompt grounding：从全文本中提取来源证据角色表，并把角色表传入每章 LLM prompt。
+- 用户影响：减少模型凭空造主角或混用人物名，让作者拿到更可编辑的剧本初稿。
+- 不做：Act 划分、跨章结构重组、retry、人工处理标记；这些仍属于 PR7/PR8。
+
 ## 项目定位
 
 AI 小说转剧本工具。用户输入 3 章以上小说文本或 EPUB，系统生成结构化剧本 YAML，并提供原文与剧本的并排对照和编辑入口。
