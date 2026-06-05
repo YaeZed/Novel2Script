@@ -13,6 +13,7 @@ export interface StatusResponse {
   chapters_done: number;
   total_chapters: number;
   error_message: string;
+  llm_provider: string;
 }
 
 export interface ResultResponse {

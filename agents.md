@@ -9,7 +9,7 @@
 |----|------|------|
 | 前端 | Vue 3 + Vite + TypeScript | SPA，上传/进度/对照视图三页面 |
 | 后端 | Django + Django REST Framework | API 服务，LLM 调用编排 |
-| AI | Claude API (anthropic Python SDK) | 文本→剧本结构化转换 |
+| AI | 多厂商 LLM provider（Anthropic / OpenAI / 阿里千问） | 文本→剧本结构化转换 |
 | 校验 | zod (前端) + js-yaml | Schema 校验，YAML 解析 |
 | 部署 | Vercel（前端）+ Render（后端） | 免费层部署 |
 
@@ -82,6 +82,7 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 ### 后端 (Python)
 - Django + Django REST Framework
 - anthropic (Claude API SDK)
+- openai (OpenAI SDK；同时用于阿里千问 OpenAI-compatible 接口)
 - ebooklib (EPUB 解析)
 - django-cors-headers (CORS)
 - python-dotenv (环境变量)

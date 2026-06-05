@@ -254,6 +254,49 @@ main {
   color: #b42318;
 }
 
+.provider-note {
+  margin: 14px 0 0;
+  color: #52615d;
+  font-size: 13px;
+}
+
+.provider-note[data-provider="placeholder"] {
+  color: #0f5d3e;
+}
+
+.provider-note[data-provider="misconfigured"] {
+  color: #a2231a;
+}
+
+.validation-note {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #d8d1c3;
+  border-radius: 8px;
+  color: #374843;
+  background: #f7f3ec;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.validation-note[data-status="valid"] {
+  color: #0f5d3e;
+  border-color: #b7dfc8;
+  background: #e9f7ee;
+}
+
+.validation-note[data-status="invalid"] {
+  color: #a2231a;
+  border-color: #f0b8ad;
+  background: #fff0ed;
+}
+
+.validation-note[data-status="dirty"] {
+  color: #765100;
+  border-color: #ebd08e;
+  background: #fff7df;
+}
+
 .yaml-preview {
   display: grid;
   gap: 10px;
@@ -423,4 +466,3 @@ main {
     max-height: 280px;
   }
 }
-

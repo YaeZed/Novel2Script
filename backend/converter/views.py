@@ -10,6 +10,7 @@ from .serializers import (
     ConversionStatusSerializer,
 )
 from .services.epub_parser import extract_epub_text
+from .services.error_messages import format_conversion_error
 from .services.pipeline import run_conversion_task
 
 
@@ -44,7 +45,7 @@ class ConvertView(APIView):
             run_conversion_task(task)
         except Exception as exc:  # noqa: BLE001
             task.status = ConversionTask.Status.FAILED
-            task.error_message = str(exc)
+            task.error_message = format_conversion_error(exc)
             task.progress = 100
             task.save(update_fields=["status", "error_message", "progress", "updated_at"])
 

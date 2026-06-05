@@ -37,4 +37,6 @@ acts:
 
 ## 第一版策略
 
-占位转换按章节生成场景，每章前 5 个段落转为 beat。含冒号的段落识别为 dialogue，其余识别为 action。Claude API 接入后仍保持同一 Schema，避免前端和用户编辑格式反复变化。
+未配置 LLM key 时，占位转换按章节生成场景，每章前 5 个段落转为 beat。含冒号的段落识别为 dialogue，其余识别为 action。
+
+配置 LLM key 后，后端使用所选厂商将单章转换为 Scene JSON，再组装为同一 YAML Schema。当前支持 `anthropic`、`openai`、`qwen`；OpenAI 和千问共用 OpenAI-compatible client。这样前端和用户编辑格式不随生成方式变化。
