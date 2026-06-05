@@ -53,7 +53,7 @@ Phase 4
 
 ### Phase 4: 后端完整功能
 - [x] PR5: 章节拆分 + EPUB 解析
-- [ ] PR6: 角色提取 + prompt grounding
+- [x] PR6: 角色提取 + prompt grounding
 - [ ] PR7: 多章拼装 + Act 合并
 - [ ] PR8: 错误兜底（retry + 人工标记）
 - **Status:** pending
@@ -96,6 +96,19 @@ Phase 4
 | PR5 English heading test only returned 1 chapter | `python manage.py test` after first splitter patch | Replaced newline-consuming `\s*` heading regex whitespace with line-local whitespace so title matches cannot cross line boundaries |
 
 ## Notes
+
+## 2026-06-05 PR6 Execution Plan
+
+- Problem: PR5 made chapter and EPUB input cleaner, but the role context is still weak because the pipeline only recognizes simple `Name: dialogue` lines.
+- User impact: better character extraction should reduce invented names, make dialogue beats easier to edit, and give authors a clearer first draft without asking them to manually prepare a cast list.
+- Scope:
+  - Create a local, evidence-aware character extractor from full source text.
+  - Use dialogue labels, quoted dialogue attribution, and narration action hints while filtering obvious metadata labels.
+  - Feed the extracted character table into scene prompts with stricter grounding rules.
+  - Keep Act grouping, retry, and manual-review fallback for PR7/PR8.
+- Validation target:
+  - Backend unit tests for extraction, prompt grounding, and pipeline persistence.
+  - `python -m compileall backend`, `python manage.py check`, `python manage.py test`, and frontend build.
 
 ## 2026-06-05 PR5 Execution Plan
 

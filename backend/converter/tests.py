@@ -5,14 +5,16 @@ from django.test import TestCase, override_settings
 from ebooklib import ITEM_DOCUMENT
 
 from converter.models import ConversionTask
+from converter.services.character_extractor import extract_character_table
 from converter.services.chapter_splitter import Chapter, split_chapters
 from converter.services.epub_parser import extract_epub_text
 from converter.services.llm_scene_converter import (
     ClaudeSceneConverter,
     OpenAICompatibleSceneConverter,
     SceneConversionError,
+    build_chapter_prompt,
 )
-from converter.services.pipeline import build_scene_converter, run_conversion_task
+from converter.services.pipeline import PlaceholderSceneConverter, build_scene_converter, run_conversion_task
 
 
 SAMPLE_TEXT = (
@@ -55,6 +57,48 @@ class ChapterSplitterTests(TestCase):
         self.assertGreater(len(chapters), 1)
         self.assertTrue(chapters[0].title.startswith("全文（分块 1/"))
         self.assertLessEqual(len(chapters[0].text), 1000)
+
+
+class CharacterExtractorTests(TestCase):
+    def test_extracts_dialogue_and_narration_evidence(self) -> None:
+        text = (
+            "\u7b2c\u4e00\u7ae0 \u96e8\u591c\n"
+            "\u6807\u9898\uff1a\u4e0d\u5e94\u8be5\u662f\u89d2\u8272\n"
+            "\u6797\u7167\uff1a\u4eca\u665a\u4e0d\u80fd\u518d\u7b49\u4e86\u3002\n"
+            "\u201c\u522b\u51fa\u58f0\u3002\u201d\u6c88\u5c9a\u4f4e\u58f0\u8bf4\u3002\n"
+            "\u6c88\u5c9a\u62ac\u5934\uff0c\u770b\u89c1\u540e\u53f0\u95e8\u7f1d\u91cc\u7684\u51b7\u5149\u3002\n"
+            "\u6797\u7167\uff1a\u8ddf\u6211\u8d70\u3002\n"
+        )
+
+        characters = extract_character_table(text)
+        by_name = {character["name"]: character for character in characters}
+
+        self.assertEqual(characters[0]["name"], "\u6797\u7167")
+        self.assertIn("\u6c88\u5c9a", by_name)
+        self.assertNotIn("\u6807\u9898", by_name)
+        self.assertEqual(by_name["\u6797\u7167"]["role"], "\u4e3b\u8981\u89d2\u8272")
+        self.assertIn("\u5bf9\u8bdd\u6807\u8bb0", by_name["\u6797\u7167"]["description"])
+        self.assertIn("\u5bf9\u8bdd\u5f52\u56e0", by_name["\u6c88\u5c9a"]["description"])
+        self.assertIn("\u53d9\u8ff0\u52a8\u4f5c", by_name["\u6c88\u5c9a"]["description"])
+
+    def test_filters_metadata_colon_labels(self) -> None:
+        text = (
+            "\u65f6\u95f4\uff1a\u6df1\u591c\n"
+            "\u5730\u70b9\uff1a\u65e7\u620f\u9662\n"
+            "\u5907\u6ce8\uff1a\u706f\u5149\u5f88\u6697\n"
+            "\u6797\u7167\uff1a\u95e8\u540e\u6709\u4eba\u3002\n"
+        )
+
+        names = [character["name"] for character in extract_character_table(text)]
+
+        self.assertEqual(names, ["\u6797\u7167"])
+
+    def test_extracts_inline_speaker_after_metadata_labels(self) -> None:
+        text = "\u65f6\u95f4\uff1a\u3001\u5730\u70b9\uff1a\u3001\u6797\u7167\uff1a\u5bf9\u767d"
+
+        names = [character["name"] for character in extract_character_table(text)]
+
+        self.assertEqual(names, ["\u6797\u7167"])
 
 
 class FakeEpubItem:
@@ -159,6 +203,24 @@ class FakeOpenAIClient:
 
 
 class ClaudeSceneConverterTests(TestCase):
+    def test_chapter_prompt_includes_character_grounding(self) -> None:
+        chapter = Chapter(index=1, title="\u7b2c\u4e00\u7ae0 \u96e8\u591c", text=SAMPLE_TEXT)
+        characters = [
+            {
+                "name": "\u6797\u7167",
+                "role": "\u4e3b\u8981\u89d2\u8272",
+                "description": "\u539f\u6587\u8bc1\u636e\uff1a2 \u5904\u5bf9\u8bdd\u6807\u8bb0",
+            }
+        ]
+
+        prompt = build_chapter_prompt(chapter, characters)
+
+        self.assertIn("Grounding rules:", prompt)
+        self.assertIn("Use only the provided chapter text", prompt)
+        self.assertIn("Known characters JSON", prompt)
+        self.assertIn("\u6797\u7167", prompt)
+        self.assertIn("<chapter_text>", prompt)
+
     def test_converts_claude_json_response_to_scene(self) -> None:
         client = FakeClaudeClient(
             """
@@ -322,6 +384,67 @@ class ConversionApiTests(TestCase):
 
 
 class ConversionPipelineTests(TestCase):
+    def test_placeholder_filters_metadata_dialogue_with_character_table(self) -> None:
+        converter = PlaceholderSceneConverter()
+        chapter = Chapter(
+            index=1,
+            title="\u5168\u6587",
+            text="\u65f6\u95f4\uff1a\u6df1\u591c\n\u6797\u7167\uff1a\u95e8\u540e\u6709\u4eba\u3002",
+        )
+
+        scene = converter.convert_chapter(
+            chapter,
+            [{"name": "\u6797\u7167", "role": "\u5bf9\u8bdd\u89d2\u8272"}],
+        )
+
+        self.assertEqual(scene["beats"][0]["type"], "action")
+        self.assertEqual(scene["beats"][1]["type"], "dialogue")
+        self.assertEqual(scene["beats"][1]["character"], "\u6797\u7167")
+
+    def test_placeholder_does_not_treat_metadata_as_dialogue_without_character_table(self) -> None:
+        converter = PlaceholderSceneConverter()
+        chapter = Chapter(index=1, title="\u5168\u6587", text="\u65f6\u95f4\uff1a\u6df1\u591c")
+
+        scene = converter.convert_chapter(chapter, [])
+
+        self.assertEqual(scene["beats"], [{"type": "action", "content": "\u65f6\u95f4\uff1a\u6df1\u591c"}])
+
+    def test_placeholder_extracts_dialogue_from_inline_metadata_and_speaker(self) -> None:
+        converter = PlaceholderSceneConverter()
+        chapter = Chapter(
+            index=1,
+            title="\u5168\u6587",
+            text="\u65f6\u95f4\uff1a\u3001\u5730\u70b9\uff1a\u3001\u6797\u7167\uff1a\u5bf9\u767d",
+        )
+
+        scene = converter.convert_chapter(
+            chapter,
+            [{"name": "\u6797\u7167", "role": "\u5bf9\u8bdd\u89d2\u8272"}],
+        )
+
+        self.assertEqual(scene["beats"], [{"type": "dialogue", "character": "\u6797\u7167", "content": "\u5bf9\u767d"}])
+
+    def test_placeholder_turns_chinese_attributed_quote_into_dialogue(self) -> None:
+        converter = PlaceholderSceneConverter()
+        chapter = Chapter(index=1, title="\u5168\u6587", text="\u201c\u522b\u51fa\u58f0\u3002\u201d\u6c88\u5c9a\u4f4e\u58f0\u8bf4\u3002")
+
+        scene = converter.convert_chapter(
+            chapter,
+            [{"name": "\u6c88\u5c9a", "role": "\u53d9\u8ff0\u63d0\u53ca\u89d2\u8272"}],
+        )
+
+        self.assertEqual(
+            scene["beats"],
+            [
+                {
+                    "type": "dialogue",
+                    "character": "\u6c88\u5c9a",
+                    "content": "\u522b\u51fa\u58f0\u3002",
+                    "parenthetical": "\u4f4e\u58f0",
+                }
+            ],
+        )
+
     @override_settings(
         LLM_PROVIDER="placeholder",
         ANTHROPIC_API_KEY="real-looking-key",
@@ -385,6 +508,9 @@ class ConversionPipelineTests(TestCase):
             max_tokens=1000,
         )
         self.assertEqual(converter.convert_chapter.call_count, 2)
+        passed_characters = converter.convert_chapter.call_args_list[0].args[1]
+        self.assertEqual(passed_characters[0]["name"], "\u6797\u7167")
+        self.assertIn("\u539f\u6587\u8bc1\u636e", passed_characters[0]["description"])
         self.assertEqual(task.status, "completed")
         self.assertEqual(task.chapters_done, 2)
         self.assertIn("\u96e8\u591c\u5bf9\u5cd9", task.script_yaml)

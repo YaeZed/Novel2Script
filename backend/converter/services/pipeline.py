@@ -1,8 +1,7 @@
-import re
-
 from django.conf import settings
 
 from converter.models import ConversionTask
+from converter.services.character_extractor import extract_character_table
 from converter.services.chapter_splitter import Chapter, split_chapters
 from converter.services.llm_scene_converter import (
     ClaudeSceneConverter,
@@ -10,9 +9,6 @@ from converter.services.llm_scene_converter import (
     SceneConverter,
 )
 from schema.script_schema import build_scene, build_script, dump_script_yaml, validate_script
-
-
-SPEAKER_RE = re.compile(r"(?m)^([A-Za-z0-9_\u4e00-\u9fa5]{1,12})[\uff1a:]\s*(.+)$")
 
 
 def run_conversion_task(task: ConversionTask) -> None:
@@ -67,9 +63,9 @@ class PlaceholderSceneConverter:
     def convert_chapter(
         self,
         chapter: Chapter,
-        characters: list[dict[str, str]],  # noqa: ARG002
+        characters: list[dict[str, str]],
     ) -> dict[str, object]:
-        return build_scene(chapter_to_payload(chapter))
+        return build_scene(chapter_to_payload(chapter), characters=characters)
 
 
 def build_scene_converter() -> SceneConverter:
@@ -136,25 +132,6 @@ def conversion_progress(chapters_done: int, total_chapters: int) -> int:
     if total_chapters <= 0:
         return 90
     return min(95, 25 + int((chapters_done / total_chapters) * 65))
-
-
-def extract_character_table(text: str) -> list[dict[str, str]]:
-    names = []
-    seen: set[str] = set()
-    for match in SPEAKER_RE.finditer(text):
-        name = match.group(1).strip()
-        if name not in seen:
-            seen.add(name)
-            names.append(
-                {
-                    "name": name,
-                    "role": "\u5f85\u5b9a",
-                    "description": "\u4ece\u539f\u6587\u5bf9\u8bdd\u4e2d\u8bc6\u522b",
-                }
-            )
-        if len(names) >= 12:
-            break
-    return names
 
 
 def chapter_to_payload(chapter: Chapter) -> dict[str, object]:

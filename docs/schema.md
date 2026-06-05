@@ -2,6 +2,10 @@
 
 ## 结构
 
+## PR6 Characters Note
+
+`characters` 仍保持 `name` / `role` / `description` 三列。PR6 起，`description` 会包含简短原文证据，例如对话标记、对白归因或叙述动作出现次数；这不改变前后端 schema，只提高角色表对 prompt 和作者编辑的可用性。
+
 ```yaml
 title: 作品标题
 characters:
