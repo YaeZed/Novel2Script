@@ -2,9 +2,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
+from ebooklib import ITEM_DOCUMENT
 
 from converter.models import ConversionTask
 from converter.services.chapter_splitter import Chapter, split_chapters
+from converter.services.epub_parser import extract_epub_text
 from converter.services.llm_scene_converter import (
     ClaudeSceneConverter,
     OpenAICompatibleSceneConverter,
@@ -30,6 +32,94 @@ class ChapterSplitterTests(TestCase):
         self.assertEqual(len(chapters), 2)
         self.assertEqual(chapters[0].index, 1)
         self.assertIn("\u96e8\u591c", chapters[0].title)
+
+    def test_splits_common_preface_and_english_headings(self) -> None:
+        text = (
+            "楔子\n"
+            "旧戏院还没有开灯。\n\n"
+            "CHAPTER 2: Backstage\n"
+            "Shen Lan heard a sound behind the curtain.\n"
+        )
+
+        chapters = split_chapters(text)
+
+        self.assertEqual(len(chapters), 2)
+        self.assertEqual(chapters[0].title, "楔子")
+        self.assertEqual(chapters[1].title, "CHAPTER 2: Backstage")
+
+    def test_chunks_long_text_without_headings(self) -> None:
+        paragraphs = [f"段落{i} " + ("雨" * 90) for i in range(20)]
+
+        chapters = split_chapters("\n".join(paragraphs), chunk_char_limit=1000)
+
+        self.assertGreater(len(chapters), 1)
+        self.assertTrue(chapters[0].title.startswith("全文（分块 1/"))
+        self.assertLessEqual(len(chapters[0].text), 1000)
+
+
+class FakeEpubItem:
+    def __init__(self, item_id: str, name: str, html: str) -> None:
+        self.item_id = item_id
+        self.name = name
+        self.html = html
+
+    def get_id(self) -> str:
+        return self.item_id
+
+    def get_name(self) -> str:
+        return self.name
+
+    def get_type(self) -> int:
+        return ITEM_DOCUMENT
+
+    def get_content(self) -> bytes:
+        return self.html.encode("utf-8")
+
+
+class FakeEpubBook:
+    def __init__(self, items: list[FakeEpubItem], spine: list[tuple[str, str]]) -> None:
+        self.items = {item.get_id(): item for item in items}
+        self.spine = spine
+
+    def get_item_with_id(self, item_id: str) -> FakeEpubItem | None:
+        return self.items.get(item_id)
+
+    def get_items_of_type(self, item_type: int) -> list[FakeEpubItem]:
+        return [item for item in self.items.values() if item.get_type() == item_type]
+
+
+class EpubParserTests(TestCase):
+    def test_extracts_epub_documents_in_spine_order(self) -> None:
+        nav = FakeEpubItem(
+            "nav",
+            "nav.xhtml",
+            "<html><body><h1>目录</h1><p>第一章</p><p>第二章</p></body></html>",
+        )
+        first = FakeEpubItem(
+            "chapter-1",
+            "chapter1.xhtml",
+            "<html><head><title>Rain Night</title></head><body><p>雨落在旧戏院。</p></body></html>",
+        )
+        second = FakeEpubItem(
+            "chapter-2",
+            "chapter2.xhtml",
+            "<html><head><title>Backstage</title></head><body><p>后台门缝透出冷光。</p></body></html>",
+        )
+        book = FakeEpubBook(
+            items=[second, nav, first],
+            spine=[("chapter-1", "yes"), ("chapter-2", "yes"), ("nav", "yes")],
+        )
+
+        with patch("converter.services.epub_parser.epub.read_epub", return_value=book):
+            text = extract_epub_text(b"fake epub bytes")
+
+        self.assertIn("第1章 Rain Night", text)
+        self.assertIn("第2章 Backstage", text)
+        self.assertLess(text.index("第1章 Rain Night"), text.index("第2章 Backstage"))
+        self.assertNotIn("目录", text)
+
+        chapters = split_chapters(text)
+        self.assertEqual([chapter.title for chapter in chapters], ["第1章 Rain Night", "第2章 Backstage"])
 
 
 class FakeClaudeMessages:

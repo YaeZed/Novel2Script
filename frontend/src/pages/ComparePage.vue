@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { CheckCircle2, Download, RefreshCw } from "@lucide/vue";
 import { YAMLException, load } from "js-yaml";
 import { ZodError, type ZodIssue } from "zod";
@@ -13,7 +13,10 @@ const props = defineProps<{
 
 const result = ref<ResultResponse | null>(null);
 const yamlText = ref("");
+const yamlEditor = ref<HTMLTextAreaElement | null>(null);
+const sourceTextPane = ref<HTMLElement | null>(null);
 const activeScene = ref(0);
+const sourceScrollByScene = ref<Record<string, number>>({});
 const error = ref("");
 const validationStatus = ref<"idle" | "dirty" | "valid" | "invalid">("idle");
 const validationDetail = ref("");
@@ -45,6 +48,8 @@ async function loadResult() {
     yamlText.value = result.value.script_yaml;
     validateYaml();
     activeScene.value = 0;
+    sourceScrollByScene.value = {};
+    restoreSceneScrollState();
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : "结果读取失败";
   }
@@ -129,9 +134,175 @@ function downloadYaml() {
   URL.revokeObjectURL(url);
 }
 
+function selectScene(index: number) {
+  rememberActiveSourceScroll();
+  activeScene.value = index;
+  restoreSceneScrollState();
+}
+
+async function restoreSceneScrollState() {
+  await nextTick();
+  restoreSourceScroll();
+  scrollYamlToActiveScene();
+}
+
+function rememberActiveSourceScroll() {
+  const pane = sourceTextPane.value;
+  if (!pane) {
+    return;
+  }
+
+  sourceScrollByScene.value[sceneStorageKey(activeScene.value)] = pane.scrollTop;
+}
+
+function restoreSourceScroll() {
+  const pane = sourceTextPane.value;
+  if (!pane) {
+    return;
+  }
+
+  pane.scrollTop = sourceScrollByScene.value[sceneStorageKey(activeScene.value)] ?? 0;
+}
+
+function sceneStorageKey(index: number) {
+  const scene = scenes.value[index];
+  if (!scene) {
+    return `missing:${index}`;
+  }
+  return `${index}:${scene.source_chapter}:${scene.number}:${scene.title}`;
+}
+
+function scrollYamlToActiveScene() {
+  const editor = yamlEditor.value;
+  if (!editor) {
+    return;
+  }
+
+  const lineIndex = findSceneYamlLineIndex(activeScene.value);
+  if (lineIndex < 0) {
+    return;
+  }
+
+  const offset = offsetForLine(yamlText.value, lineIndex);
+  editor.setSelectionRange(offset, offset);
+  editor.scrollTop = yamlScrollTopForLine(editor, yamlText.value, lineIndex);
+}
+
+function findSceneYamlLineIndex(sceneIndex: number) {
+  const lines = yamlText.value.split("\n");
+  const blocks = findSceneYamlBlocks(lines);
+  return blocks[sceneIndex] ?? -1;
+}
+
+function findSceneYamlBlocks(lines: string[]) {
+  const sceneBlocks: number[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^(\s*)-\s+number:\s+\d+\s*$/.exec(lines[index]);
+    if (!match) {
+      continue;
+    }
+
+    const indent = match[1].length;
+    const block = lines.slice(index, findYamlListBlockEnd(lines, index, indent));
+    if (isSceneYamlBlock(block, indent)) {
+      sceneBlocks.push(index);
+    }
+  }
+
+  return sceneBlocks;
+}
+
+function findYamlListBlockEnd(lines: string[], startIndex: number, indent: number) {
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const match = /^(\s*)-\s+\S/.exec(lines[index]);
+    if (match && match[1].length <= indent) {
+      return index;
+    }
+  }
+  return lines.length;
+}
+
+function isSceneYamlBlock(block: string[], indent: number) {
+  const childIndent = indent + 2;
+  return block.some((line) => directChildLineStartsWith(line, childIndent, "source_chapter:"))
+    && block.some((line) => directChildLineStartsWith(line, childIndent, "beats:"));
+}
+
+function directChildLineStartsWith(line: string, indent: number, prefix: string) {
+  return line.slice(0, indent) === " ".repeat(indent) && line.slice(indent).startsWith(prefix);
+}
+
+function yamlScrollTopForLine(editor: HTMLTextAreaElement, text: string, lineIndex: number) {
+  const markerTop = measureTextareaLineTop(editor, text, lineIndex);
+  return Math.max(0, markerTop - editor.clientHeight * 0.18);
+}
+
+function measureTextareaLineTop(editor: HTMLTextAreaElement, text: string, lineIndex: number) {
+  const styles = window.getComputedStyle(editor);
+  const mirror = document.createElement("div");
+  const mirroredProperties = [
+    "boxSizing",
+    "width",
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "fontStyle",
+    "letterSpacing",
+    "lineHeight",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "borderTopWidth",
+    "borderRightWidth",
+    "borderBottomWidth",
+    "borderLeftWidth",
+  ] as const;
+
+  for (const property of mirroredProperties) {
+    mirror.style[property] = styles[property];
+  }
+
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.left = "-9999px";
+  mirror.style.top = "0";
+  mirror.style.height = "auto";
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.overflowWrap = "break-word";
+  mirror.style.wordBreak = "normal";
+  mirror.style.width = `${editor.clientWidth}px`;
+
+  const lines = text.split("\n");
+  mirror.textContent = lineIndex > 0 ? `${lines.slice(0, lineIndex).join("\n")}\n` : "";
+
+  const marker = document.createElement("span");
+  marker.textContent = "\u200b";
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+  const markerTop = marker.offsetTop;
+  mirror.remove();
+  return markerTop;
+}
+
+function offsetForLine(text: string, lineIndex: number) {
+  if (lineIndex <= 0) {
+    return 0;
+  }
+
+  let offset = 0;
+  const lines = text.split("\n");
+  for (let index = 0; index < lineIndex; index += 1) {
+    offset += lines[index].length + 1;
+  }
+  return offset;
+}
+
 watch(scenes, (nextScenes) => {
   if (activeScene.value >= nextScenes.length) {
     activeScene.value = Math.max(nextScenes.length - 1, 0);
+    restoreSceneScrollState();
   }
 });
 
@@ -153,7 +324,7 @@ onMounted(loadResult);
         class="scene-button"
         :class="{ active: activeScene === index }"
         type="button"
-        @click="activeScene = index"
+        @click="selectScene(index)"
       >
         <span>{{ scene.number }}</span>
         <strong>{{ scene.title }}</strong>
@@ -168,7 +339,7 @@ onMounted(loadResult);
             <h1>{{ currentChapter?.title || "未选择场景" }}</h1>
           </div>
         </div>
-        <article class="source-text">{{ currentChapter?.text }}</article>
+        <article ref="sourceTextPane" class="source-text" @scroll="rememberActiveSourceScroll">{{ currentChapter?.text }}</article>
       </div>
 
       <div class="panel compare-pane">
@@ -194,6 +365,7 @@ onMounted(loadResult);
           {{ validationDetail }}
         </p>
         <textarea
+          ref="yamlEditor"
           v-model="yamlText"
           class="yaml-editor"
           spellcheck="false"

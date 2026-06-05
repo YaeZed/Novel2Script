@@ -206,3 +206,42 @@
 - Next:
   - Start Phase 4 from latest `master`.
   - Keep PR5-PR8 scoped to backend completeness rather than model provider plumbing, which is already merged.
+
+## Session: 2026-06-05 Phase 4 PR5 Execution
+
+### PR5: chapter splitting + EPUB parsing
+- **Status:** complete
+- Actions taken:
+  - Read planning-with-files instructions and restored `task_plan.md`, `findings.md`, `progress.md`.
+  - Ran planning session catchup; unsynced context only repeated the initial planning handoff and does not change PR5 scope.
+  - Confirmed local `master` matches `origin/master` at `9c1a5c2`.
+  - Created branch `codex/phase-4-pr5-chapter-epub`.
+  - Recorded PR5 first-principles design boundary in `task_plan.md` and `findings.md`.
+  - Enhanced chapter heading recognition for Chinese, preface/extra chapters, English `Chapter N`, and numeric headings.
+  - Added paragraph-based fallback chunking for long text without chapter headings and oversized chapters.
+  - Changed EPUB parsing to use spine order, skip short auxiliary documents, preserve/derive chapter headings, and avoid duplicating `<title>` in body text.
+  - Added splitter and EPUB parser regression tests.
+- Current scope:
+  - Strengthen chapter splitting and EPUB parsing only.
+  - Keep character extraction, Act merging, retry, and manual-review flags for PR6-PR8.
+- Validation:
+  - `python -m compileall .`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 16 tests.
+  - `npm run build`: passed.
+- Errors:
+  - First `python manage.py test` run failed because `\s*` in the heading regex consumed newlines and made the English/preface split test return one chapter.
+  - Fixed by changing regex whitespace to line-local whitespace (`[^\S\n]`), then reran tests successfully.
+
+### PR5 hand-test feedback: compare scene YAML positioning
+- **Status:** complete
+- User observed in the browser that switching scenes updated the source text but left the YAML editor visually on the previous/full document position.
+- Root cause:
+  - Compare page kept the YAML editor as one full-document textarea and only changed `activeScene`; it did not move the editor cursor/scroll position to the selected scene.
+- Action taken:
+  - Added scene selection handling in `ComparePage.vue` that scrolls to the selected scene's YAML block.
+  - Reworked YAML positioning to detect scene blocks by YAML structure (`source_chapter` + `beats`) instead of a fixed two-space `- number` regex.
+  - Added per-scene source text scroll memory so returning to a scene restores that scene's original scroll position.
+  - Kept full-document YAML editing/download behavior unchanged.
+- Validation:
+  - `npm run build`: passed.
