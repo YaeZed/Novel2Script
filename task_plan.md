@@ -4,17 +4,17 @@
 构建一个 AI 辅助剧本创作工具，用户上传 3 章以上小说文本（txt/epub/粘贴），自动转换为结构化剧本（YAML 格式），并提供原文 vs 剧本并排对照视图，3 天内完成并部署上线。
 
 ## Current Phase
-Phase 1
+Phase 3
 
 ## PR 策略
 
-每 PR 只做一件事，小粒度持续提交，main 分支始终保持可运行。
+每 PR 只做一件事，小粒度持续提交，`master` 分支始终保持可运行。
 
 | PR# | 功能 | 预估提交量 | 所属阶段 |
 |-----|------|-----------|---------|
 | PR1 | 项目脚手架：Vue 3 + Vite 前端 + Django 后端 + 目录结构 | 1 commit | Phase 2 |
 | PR2 | YAML Schema 定义 + zod/js-yaml 校验模块 | 1 commit | Phase 2 |
-| PR3 | Claude API 单章转换 pipeline（后端核心） | 2-3 commits | Phase 3 |
+| PR3 | 多厂商 LLM 单章转换 pipeline（后端核心） | 2-3 commits | Phase 3 |
 | PR4 | Django API 端点：convert / status / result | 1 commit | Phase 3 |
 | PR5 | 分块策略：章节拆分 + EPUB 解析 | 2 commits | Phase 4 |
 | PR6 | 角色提取：全文角色表 + prompt 约束 | 2 commits | Phase 4 |
@@ -30,7 +30,7 @@ Phase 1
 ## Phases
 
 ### Phase 1: 需求确认
-- [x] 技术选型（Vue 3 + Django + Claude API）
+- [x] 技术选型（Vue 3 + Django + 多厂商 LLM provider）
 - [x] 输入方式确认（粘贴/txt/epub）
 - [x] Schema 颗粒度确认（Act → Scene → Beat）
 - [x] 对照视图交互确认（按场对齐）
@@ -39,17 +39,17 @@ Phase 1
 - **Status:** complete
 
 ### Phase 2: 项目初始化 + 核心定义
-- [ ] PR1: 项目脚手架搭建
-- [ ] PR2: YAML Schema 定义 + 校验模块
-- [ ] Django models 定义
-- [ ] Vue Router 页面骨架
-- **Status:** pending
+- [x] PR1/P2 合并提交：项目脚手架 + YAML Schema 基线 + 占位转换主链路
+- [x] Django models 定义
+- [x] Vue Router 页面骨架
+- [x] 浏览器手动验收通过
+- **Status:** complete
 
 ### Phase 3: 后端核心管道
-- [ ] PR3: Claude API 单章转换 pipeline
-- [ ] PR4: Django API 端点（convert / status / result）
-- [ ] 单章 → 合规 YAML 端到端跑通
-- **Status:** pending
+- [x] PR3: 多厂商 LLM 单章转换 pipeline
+- [x] PR4: Django API 端点（convert / status / result）已在 Phase 2 骨架中提供占位版
+- [x] 单章 → 合规 YAML 端到端跑通
+- **Status:** complete
 
 ### Phase 4: 后端完整功能
 - [ ] PR5: 章节拆分 + EPUB 解析
@@ -71,7 +71,7 @@ Phase 1
 - **Status:** pending
 
 ## Key Questions
-1. Claude API 单次输出完整 Scene YAML 的稳定性能否保证？→ 通过分块 + 重试兜底
+1. 多厂商 LLM 单次输出完整 Scene YAML 的稳定性能否保证？→ 通过 provider 抽象 + 分块 + 重试兜底
 2. EPUB 格式兼容性边界在哪？→ 只支持标准 EPUB2/3，不做复杂容错
 3. Render 免费层冷启动 30s 对用户体验影响？→ toast 提示 + 进度页等待
 4. 长文本 chunk 之间角色一致性？→ 角色表先行提取策略
@@ -81,7 +81,7 @@ Phase 1
 |----------|-----------|
 | Vue 3 + Vite + TS 前端 | 用户熟悉，学习成本最低 |
 | Django 后端 | 用户熟悉，ORM/admin 省时间 |
-| Claude API (anthropic SDK) | 长上下文 + 结构化输出稳定性 |
+| 多厂商 LLM provider | Anthropic/OpenAI/千问可按 key 和部署环境切换，降低单一厂商风险 |
 | js-yaml + zod 校验 | YAML 解析 + schema 兜底修复 |
 | Vercel + Render 免费部署 | 零成本，demo 项目足够 |
 | Act → Scene → Beat 三层 Schema | 深于竞品，能表达戏剧节奏 |
@@ -96,6 +96,60 @@ Phase 1
 |       |         |            |
 
 ## Notes
-- 每天结束时 main 分支必须可运行
+
+## 2026-06-05 Phase 2 Merge Summary
+
+- Phase 2 is complete and merged to GitHub `master` through PR #1.
+- Merged branch: `codex/phase-2-scaffold`.
+- Merge commit on remote master: `14ca2bf`.
+- Feature commit: `8407950 Build phase 2 project scaffold`.
+- Delivered:
+  - `CODEX.md` project rules
+  - Django/DRF backend scaffold, model, migration, API routes
+  - Vue/Vite frontend scaffold with upload, progress, compare pages
+  - Python JSON Schema, YAML dump, frontend zod schema
+  - Placeholder conversion path for local end-to-end testing
+- Verification:
+  - `python manage.py test`
+  - `python manage.py check`
+  - `npm run build`
+  - Browser manual test of sample conversion and compare page YAML validation
+- Next step:
+  - Sync local `master` with `origin/master`.
+  - Create a new Phase 3 branch from latest `master`.
+  - Implement multi-provider LLM single-chapter conversion as its own PR.
+
+## 2026-06-05 P2 Acceptance
+
+- User tested Phase 2 and reported no issues.
+- One UX fix was made during testing: the YAML validation toolbar icon now uses a check icon instead of a save icon.
+- Phase 2 commit after amend: `8407950 Build phase 2 project scaffold`.
+- Phase 2 PR was merged on GitHub.
+- 每天结束时 `master` 分支必须可运行
 - 每个 PR 合并后验证 `python manage.py runserver` 不报错
 - README 需列明所有第三方依赖及原创功能说明
+
+## 2026-06-05 P3 Execution Plan
+
+- 范围：只实现多厂商 LLM 单章转换为 Scene JSON，再组装进既有 Act → Scene → Beat YAML Schema。
+- 不做：全文角色提取、多章拼装策略、retry/人工标记，这些保留给 Phase 4，避免 PR3 扩散。
+- 用户影响：配置 Anthropic/OpenAI/千问任一 key 时得到真实剧本草稿；没有 key 时继续走占位转换，保证演示和前端验收不断。
+- 技术路径：新增 provider-agnostic scene converter 抽象，pipeline 根据 `LLM_PROVIDER` 和 API key 选择 Anthropic、OpenAI、千问或 placeholder；LLM 输出必须经 JSON 解析、字段归一化、最终 schema 校验。
+
+## 2026-06-05 P3 Completion
+
+- Delivered:
+  - 多厂商 provider 配置：`auto` / `anthropic` / `openai` / `qwen` / `placeholder`
+  - Anthropic adapter + OpenAI-compatible adapter（OpenAI 和千问共用）
+  - LLM Scene JSON 解析、字段归一化、Beat type 校验、Schema 兜底
+  - 无 key 时 placeholder fallback，保证 demo 主链路不被外部服务阻断
+  - `.env.example` / `README.md` / `CODEX.md` / `docs/schema.md` 同步配置说明
+- Validation:
+  - `python -m compileall backend`
+  - `python manage.py check`
+  - `python manage.py test`
+  - `python -m pip install -r requirements.txt`
+  - `python -c "import openai; print(openai.__version__)"`
+  - `npm run build`
+- Note:
+  - 未使用真实厂商 key 调用外部 LLM；provider 分支通过 fake client 和 pipeline 配置测试覆盖。

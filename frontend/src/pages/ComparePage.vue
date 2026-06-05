@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { CheckCircle2, Download, RefreshCw } from "@lucide/vue";
-import { load } from "js-yaml";
+import { YAMLException, load } from "js-yaml";
+import { ZodError, type ZodIssue } from "zod";
 
 import { getResult, type ResultResponse } from "../api/client";
 import { scriptSchema, type ScriptDocument } from "../schemas/script";
@@ -14,20 +15,24 @@ const result = ref<ResultResponse | null>(null);
 const yamlText = ref("");
 const activeScene = ref(0);
 const error = ref("");
-const validationMessage = ref("");
+const validationStatus = ref<"idle" | "dirty" | "valid" | "invalid">("idle");
+const validationDetail = ref("");
+const lastValidScript = ref<ScriptDocument | null>(null);
 
-const script = computed<ScriptDocument | null>(() => {
-  if (!yamlText.value.trim()) {
-    return null;
+const validationTitle = computed(() => {
+  if (validationStatus.value === "valid") {
+    return "YAML 有效";
   }
-  try {
-    return scriptSchema.parse(load(yamlText.value));
-  } catch {
-    return null;
+  if (validationStatus.value === "invalid") {
+    return "YAML 需要修正";
   }
+  if (validationStatus.value === "dirty") {
+    return "有未校验修改";
+  }
+  return "待校验";
 });
 
-const scenes = computed(() => script.value?.acts.flatMap((act) => act.scenes) ?? []);
+const scenes = computed(() => lastValidScript.value?.acts.flatMap((act) => act.scenes) ?? []);
 const currentScene = computed(() => scenes.value[activeScene.value]);
 const currentChapter = computed(() => {
   const chapterIndex = currentScene.value?.source_chapter;
@@ -39,6 +44,7 @@ async function loadResult() {
     result.value = await getResult(props.taskId);
     yamlText.value = result.value.script_yaml;
     validateYaml();
+    activeScene.value = 0;
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : "结果读取失败";
   }
@@ -46,11 +52,71 @@ async function loadResult() {
 
 function validateYaml() {
   try {
-    scriptSchema.parse(load(yamlText.value));
-    validationMessage.value = "YAML 有效";
+    const parsed = scriptSchema.parse(load(yamlText.value));
+    lastValidScript.value = parsed;
+    validationStatus.value = "valid";
+    validationDetail.value = "结构符合 Act / Scene / Beat 约定。";
   } catch (caught) {
-    validationMessage.value = caught instanceof Error ? caught.message : "YAML 无效";
+    validationStatus.value = "invalid";
+    validationDetail.value = formatValidationError(caught);
   }
+}
+
+function markDirty() {
+  if (validationStatus.value === "valid" || validationStatus.value === "invalid") {
+    validationStatus.value = "dirty";
+    validationDetail.value = "当前修改尚未校验；左侧仍显示上一次有效结构。";
+  }
+}
+
+function formatValidationError(caught: unknown) {
+  if (caught instanceof ZodError) {
+    return formatZodIssue(caught.issues[0]);
+  }
+  if (caught instanceof YAMLException) {
+    return `YAML 语法错误：${caught.reason || caught.message}`;
+  }
+  return "YAML 无效，请检查缩进、字段名和字段值。";
+}
+
+function formatZodIssue(issue: ZodIssue | undefined) {
+  if (!issue) {
+    return "剧本结构不符合 Schema。";
+  }
+
+  const path = issue.path.join(".");
+  const location = humanizePath(issue.path);
+  if (issue.code === "invalid_enum_value" && path.endsWith(".type")) {
+    return `${location}：type 只能是 dialogue、action 或 direction，当前是 ${String(issue.received)}。`;
+  }
+  if (issue.code === "invalid_type") {
+    return `${location}：字段类型不正确，期望 ${issue.expected}。`;
+  }
+  if (issue.code === "too_small") {
+    return `${location}：至少需要 ${issue.minimum} 项。`;
+  }
+  return `${location}：${issue.message}`;
+}
+
+function humanizePath(path: Array<string | number>) {
+  const parts: string[] = [];
+  for (let index = 0; index < path.length; index += 1) {
+    const segment = path[index];
+    const next = path[index + 1];
+    if (segment === "acts" && typeof next === "number") {
+      parts.push(`第 ${next + 1} 幕`);
+      index += 1;
+    } else if (segment === "scenes" && typeof next === "number") {
+      parts.push(`第 ${next + 1} 场`);
+      index += 1;
+    } else if (segment === "beats" && typeof next === "number") {
+      parts.push(`第 ${next + 1} 个节拍`);
+      index += 1;
+    } else if (typeof segment === "string") {
+      parts.push(`字段 ${segment}`);
+    }
+  }
+  return parts.join(" / ") || "当前 YAML";
 }
 
 function downloadYaml() {
@@ -62,6 +128,12 @@ function downloadYaml() {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+watch(scenes, (nextScenes) => {
+  if (activeScene.value >= nextScenes.length) {
+    activeScene.value = Math.max(nextScenes.length - 1, 0);
+  }
+});
 
 onMounted(loadResult);
 </script>
@@ -103,7 +175,7 @@ onMounted(loadResult);
         <div class="pane-header">
           <div>
             <p class="eyebrow">剧本 YAML</p>
-            <h1>{{ validationMessage || "待校验" }}</h1>
+            <h1>{{ validationTitle }}</h1>
           </div>
           <div class="toolbar">
             <button class="icon-button" type="button" aria-label="校验 YAML" @click="validateYaml">
@@ -114,7 +186,20 @@ onMounted(loadResult);
             </button>
           </div>
         </div>
-        <textarea v-model="yamlText" class="yaml-editor" spellcheck="false" @blur="validateYaml" />
+        <p
+          v-if="validationDetail"
+          class="validation-note"
+          :data-status="validationStatus"
+        >
+          {{ validationDetail }}
+        </p>
+        <textarea
+          v-model="yamlText"
+          class="yaml-editor"
+          spellcheck="false"
+          @input="markDirty"
+          @blur="validateYaml"
+        />
       </div>
     </div>
 

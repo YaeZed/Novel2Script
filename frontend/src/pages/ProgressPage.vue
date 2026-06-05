@@ -25,6 +25,25 @@ const progressLabel = computed(() => {
   return `已处理 ${status.value.chapters_done}/${status.value.total_chapters || "?"} 章`;
 });
 
+const providerLabel = computed(() => {
+  const provider = status.value?.llm_provider;
+  if (!provider) {
+    return "模式读取中";
+  }
+  if (provider === "placeholder") {
+    return "当前模式：本地占位，不调用外部模型";
+  }
+  if (provider === "misconfigured") {
+    return "当前模式：模型配置需要修正";
+  }
+  const providerNames: Record<string, string> = {
+    anthropic: "Anthropic",
+    openai: "OpenAI",
+    qwen: "阿里千问",
+  };
+  return `当前模式：${providerNames[provider] || provider} 真实模型`;
+});
+
 onMounted(start);
 </script>
 
@@ -42,6 +61,10 @@ onMounted(start);
       <div class="meter" aria-label="转换进度">
         <span :style="{ width: `${status?.progress ?? 8}%` }"></span>
       </div>
+
+      <p v-if="status" class="provider-note" :data-provider="status.llm_provider">
+        {{ providerLabel }}
+      </p>
 
       <p v-if="error" class="error-text">{{ error }}</p>
       <p v-if="status?.error_message" class="error-text">{{ status.error_message }}</p>

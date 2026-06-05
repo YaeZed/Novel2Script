@@ -15,4 +15,6 @@ Return strict JSON only, with this shape:
   ]
 }
 The beat type must be exactly one of dialogue, action, or direction.
+Do not wrap the JSON in markdown. Do not add explanations.
+Use scene beats to preserve dramatic action, not to summarize every sentence.
 """

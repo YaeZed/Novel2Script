@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import ConversionTask
+from .services.pipeline import resolve_llm_provider
 
 
 class ConversionCreateSerializer(serializers.Serializer):
@@ -22,13 +23,28 @@ class ConversionCreatedSerializer(serializers.Serializer):
 
 
 class ConversionStatusSerializer(serializers.ModelSerializer):
+    llm_provider = serializers.SerializerMethodField()
+
     class Meta:
         model = ConversionTask
-        fields = ["id", "status", "progress", "chapters_done", "total_chapters", "error_message"]
+        fields = [
+            "id",
+            "status",
+            "progress",
+            "chapters_done",
+            "total_chapters",
+            "error_message",
+            "llm_provider",
+        ]
+
+    def get_llm_provider(self, obj):  # noqa: ARG002
+        try:
+            return resolve_llm_provider()
+        except ValueError:
+            return "misconfigured"
 
 
 class ConversionResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConversionTask
         fields = ["id", "script_yaml", "characters", "chapters", "status", "error_message"]
-
