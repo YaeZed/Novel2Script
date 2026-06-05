@@ -52,7 +52,7 @@ Phase 4
 - **Status:** complete
 
 ### Phase 4: 后端完整功能
-- [ ] PR5: 章节拆分 + EPUB 解析
+- [x] PR5: 章节拆分 + EPUB 解析
 - [ ] PR6: 角色提取 + prompt grounding
 - [ ] PR7: 多章拼装 + Act 合并
 - [ ] PR8: 错误兜底（retry + 人工标记）
@@ -93,9 +93,33 @@ Phase 4
 ## Errors Encountered
 | Error | Attempt | Resolution |
 |-------|---------|------------|
-|       |         |            |
+| PR5 English heading test only returned 1 chapter | `python manage.py test` after first splitter patch | Replaced newline-consuming `\s*` heading regex whitespace with line-local whitespace so title matches cannot cross line boundaries |
 
 ## Notes
+
+## 2026-06-05 PR5 Execution Plan
+
+- 范围：增强后端章节拆分和 EPUB 解析，让粘贴文本、TXT、EPUB 都能得到稳定的章节列表，再交给现有逐章转换 pipeline。
+- 不做：全文角色提取、角色名统一、多章 Act 划分、retry/人工处理标记，这些仍分别属于 PR6-PR8。
+- 第一性原理：
+  - 要解决的问题：用户给的是“长篇小说材料”，系统需要先理解章节边界；没有可靠章节，进度页、失败定位、后续角色表都会失真。
+  - 最直接路径：把输入清洗、章节标题识别、章节兜底分块、EPUB spine 文本抽取做成后端纯函数，并用测试覆盖边界。
+  - 从零设计：会先产出 `Chapter` 结构（title/content/order/source），pipeline 只消费结构化章节，不关心输入来自粘贴、TXT 还是 EPUB。
+- 用户影响：上传后进度能按真实章节推进；章节标题保留下来；没有明显章节标题的长文本也不会整本塞给模型导致失败。
+
+## 2026-06-05 PR5 Completion
+
+- Delivered:
+  - 更宽的章节标题识别：中文章节、序章/楔子/番外、英文 `Chapter N`、数字标题。
+  - 无标题长文本/超长章节按段落自动分块，避免整本一次性进入 LLM。
+  - EPUB 按 spine 阅读顺序抽取正文，跳过短目录/封面/版权页。
+  - 多文档 EPUB 没有明确章名时自动生成可拆分章节标题。
+  - EPUB `<title>` 用作章节名，不重复混进正文。
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 16 tests.
+  - `npm run build`: passed.
 
 ## 2026-06-05 Phase 2 Merge Summary
 

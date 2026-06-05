@@ -72,6 +72,30 @@
 - README 需要明确 demo 版模型切换属于部署管理员边界，用户界面不开放 API key 设置。
 - 下一阶段文档写法原则：先写“当前实现”，再写“后续目标”，避免后续 agent 或评委把 roadmap 当成已交付能力。
 
+## 2026-06-05 PR5 Chapter And EPUB Findings
+
+### First-principles framing
+- 要解决的问题不是“支持更多格式”本身，而是让后端拿到可转换、可追踪、可定位失败的章节结构。
+- 最直接路径：统一三种输入来源，先做文本清洗，再识别章节标题；无法识别时按长度兜底分块，避免长文本一次性进入 LLM。
+- 从零设计会把章节拆分作为纯数据边界：`input -> chapters[] -> scene conversion`。这样后续 PR6 角色提取、PR7 Act 合并、PR8 retry 都能复用同一章节列表。
+
+### PR5 scope decisions
+- PR5 只保证章节/EPUB 进入 pipeline 的结构质量，不改变 LLM provider 抽象。
+- EPUB 只支持标准 EPUB2/3 的 spine 顺序文本抽取；复杂目录修复、PDF/Word 清洗不进入本 PR。
+- 章节标题要尽量保留，因为它会影响进度页展示、结果中的 source chapter，以及后续按章定位错误。
+- 没有章节标题的长文本需要自动 chunk。用户影响：系统会继续转换，而不是要求用户先手动分章。
+
+### Current implementation findings
+- `chapter_splitter.py` 目前只识别中文 `第X章/节/回/卷/部` 标题；无标题长文本会成为单个“全文”章节。
+- `epub_parser.py` 目前按 `book.get_items_of_type(ITEM_DOCUMENT)` 返回顺序拼接文本，不保证遵循 EPUB spine 阅读顺序。
+- `pipeline.py` 已经消费 `Chapter` dataclass，因此 PR5 可以集中增强 splitter/parser，不需要改 LLM provider 代码。
+
+### PR5 implementation findings
+- 正则标题识别不能使用裸 `\s*` 作为行尾/行首空白，因为 Python `\s` 会匹配换行，导致章节标题跨行误吞正文。
+- 多文档 EPUB 的天然边界是 spine 文档顺序。即使文档内部没有“第 X 章”标题，也应生成可拆分标题，用户才能在进度页看到真实章节推进。
+- EPUB `<head><title>` 适合做章节名，但不应该进入正文；否则对照视图会重复显示技术性标题。
+- 目录/封面/版权页只做轻量跳过：文件名或标题明显为 nav/toc/cover/copyright 且内容较短时排除，避免误删真实章节。
+
 ---
 *Update this file after every 2 view/browser/search operations*
 *This prevents visual information from being lost*
