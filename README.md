@@ -61,3 +61,5 @@ QWEN_JSON_MODE=false
 `LLM_PROVIDER` 支持 `placeholder`、`anthropic`、`openai`、`qwen`、`auto`。默认 `placeholder` 只跑本地占位转换，不调用外部模型。显式指定 `anthropic` / `openai` / `qwen` 但缺少对应 key 时，任务会失败并返回配置错误。`auto` 会按 Anthropic → OpenAI → 千问的顺序选择第一个已配置 key，只建议明确知道当前环境变量状态时使用。
 
 本地开发且 `DEBUG=true` 时，`backend/.env` 会覆盖系统环境变量；把某个 key 留空就表示禁用该 key。部署或 `DEBUG=false` 时，平台环境变量优先。修改 `.env` 后需要重启 Django 后端。
+
+演示版只支持部署管理员通过环境变量切换模型，不在用户界面开放 API key 设置。这样用户侧只需要完成上传和查看结果，密钥、额度和模型选择留在部署边界内。

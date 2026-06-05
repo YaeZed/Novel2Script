@@ -4,7 +4,7 @@
 构建一个 AI 辅助剧本创作工具，用户上传 3 章以上小说文本（txt/epub/粘贴），自动转换为结构化剧本（YAML 格式），并提供原文 vs 剧本并排对照视图，3 天内完成并部署上线。
 
 ## Current Phase
-Phase 3
+Phase 4
 
 ## PR 策略
 
@@ -153,3 +153,18 @@ Phase 3
   - `npm run build`
 - Note:
   - 未使用真实厂商 key 调用外部 LLM；provider 分支通过 fake client 和 pipeline 配置测试覆盖。
+
+## 2026-06-05 P3 Merge And Handoff
+
+- PR3 was committed as `5274491 Add multi-provider LLM pipeline`.
+- PR3 branch `codex/phase-3-claude-pipeline` was pushed and merged through GitHub PR #2.
+- `master` is now at merge commit `18457d4`.
+- User completed manual regression testing after merge:
+  - default `placeholder` demo mode
+  - explicit provider with blank key failure path
+  - Compare page invalid YAML validation path
+- Next phase is Phase 4. Keep PR5-PR8 focused on backend completeness:
+  - stronger chapter/EPUB handling
+  - fuller character extraction
+  - multi-chapter assembly and Act grouping
+  - retry and manual-review fallback

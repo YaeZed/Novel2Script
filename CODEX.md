@@ -6,9 +6,14 @@ AI 小说转剧本工具。用户输入 3 章以上小说文本或 EPUB，系统
 
 ## 当前阶段
 
-Phase 3：在已合并的 Phase 2 可运行骨架上接入多厂商 LLM pipeline。
+Phase 3 已合并到 `master`。当前主分支具备可运行的端到端 demo：
 
-当前 `master` 已具备同步占位转换：提交文本后立即生成可校验的 YAML 草稿。Phase 3 只替换/扩展生成管道，不改动已验证的上传、进度、结果、对照主链路。LLM provider 支持 Anthropic、OpenAI、阿里千问；默认 provider 是 `placeholder`，必须显式选择厂商才会调用外部模型。
+- 默认 `LLM_PROVIDER=placeholder`，无 API key 也能完成本地占位转换。
+- 显式配置 `anthropic` / `openai` / `qwen` 后，后端会调用对应模型把单章小说转换为 Scene/Beat。
+- 进度页会显示当前模型模式；provider 配置错误会显示脱敏后的中文提示。
+- 对照页 YAML 编辑已支持“草稿无效但保留最后一次有效结构”的校验体验。
+
+下一阶段进入 Phase 4：补齐更完整的后端转换能力，包括更稳的章节/EPUB 处理、角色提取、多章拼装、Act 划分、重试和人工处理标记。
 
 ## 目录约定
 
@@ -29,7 +34,8 @@ demo/
 ├── docs/                     # Product and schema docs
 ├── task_plan.md
 ├── findings.md
-└── progress.md
+├── progress.md
+└── problems.md               # 已发现问题、根因和修复复盘
 ```
 
 新目录只放对应职责的文件。跨层共享约定先写到 `docs/` 或 `CODEX.md`，再进入实现。
@@ -61,6 +67,7 @@ npm run dev
 cd backend
 python -m compileall .
 python manage.py check
+python manage.py test
 ```
 
 ```powershell

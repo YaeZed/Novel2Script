@@ -64,6 +64,14 @@
   - 模型切换由部署方完成，适合 demo 和课程展示。
   - 未来若要商业化或多人使用，再设计 BYOK（Bring Your Own Key）设置页，而不是现在提前暴露。
 
+## 2026-06-05 Post-PR3 Documentation Sync Findings
+
+- PR3 已合并到 `master` 后，文档需要从“正在做 Phase 3”切换到“Phase 3 已完成，准备 Phase 4”。
+- `agents.md` 不能把未来目标流程写成当前事实。当前实现是轻量角色表、逐章 Scene 转换、统一 YAML 组装；LLM 角色提取、多章 Act 拼装、retry 和人工标记仍属于 Phase 4。
+- 分支约定必须跟仓库实际一致：当前主分支是 `master`，不是 `main`。
+- README 需要明确 demo 版模型切换属于部署管理员边界，用户界面不开放 API key 设置。
+- 下一阶段文档写法原则：先写“当前实现”，再写“后续目标”，避免后续 agent 或评委把 roadmap 当成已交付能力。
+
 ---
 *Update this file after every 2 view/browser/search operations*
 *This prevents visual information from being lost*
@@ -104,8 +112,9 @@
 - `npm run build` passed.
 
 ### Phase boundary
-- No Phase 3 code is currently committed.
-- Earlier exploratory Claude generator work was removed before P2 was finalized, so the next branch can start cleanly from `origin/master`.
+- Historical note from the Phase 2 handoff: no Phase 3 code was committed at that time.
+- Superseded current state: Phase 3 was later completed and merged through PR #2. `master` is now at merge commit `18457d4`.
+- Earlier exploratory Claude generator work was removed before P2 was finalized, so the Phase 3 branch started cleanly from `origin/master`.
 - Hidden/background Django `runserver` processes did not expose `127.0.0.1:8000` in this desktop sandbox. Use a foreground terminal for backend live testing here.
 
 ## 2026-06-05 Phase 3 Design Findings

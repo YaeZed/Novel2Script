@@ -40,8 +40,8 @@
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | Phase 2 merged, preparing Phase 3 |
-| Where am I going? | Phase 3 → Phase 6 |
+| Where am I? | PR3 merged into `master`; preparing Phase 4 |
+| Where am I going? | Phase 4 → Phase 6 |
 | What's the goal? | AI 小说→剧本转换工具，3 天上线 |
 | What have I learned? | See findings.md |
 | What have I done? | 需求确认完成，规划文件已创建 |
@@ -81,14 +81,12 @@
   - `docs/schema.md`
 
 ### Phase 3: Claude pipeline abstraction
-- **Status:** pending
+- **Status:** superseded by the later Phase 3 multi-provider implementation
 - Actions taken:
-  - No Phase 3 code is currently committed.
+  - No Phase 3 code was committed in this early build-start session.
   - Earlier exploratory generator changes were deliberately removed to keep Phase 2 PR single-purpose.
 - Remaining:
-  - Sync local `master` to `origin/master`.
-  - Create a fresh Phase 3 branch from latest `master`.
-  - Implement multi-provider LLM single-chapter conversion as a separate PR.
+  - Superseded. Phase 3 was later completed as `codex/phase-3-claude-pipeline` and merged through PR #2.
 
 ### Phase 2 user validation
 - **Status:** accepted
@@ -191,3 +189,20 @@
   - This keeps the demo focused on the core conversion workflow.
   - It avoids introducing account, key storage, encryption, deletion, billing, and audit requirements before they are needed.
   - BYOK can be revisited later as a productized advanced setting.
+
+## Session: 2026-06-05 Post-PR3 Neat-Freak Sync
+
+### PR3 merge verification and documentation alignment
+- **Status:** complete
+- Context:
+  - User merged PR3 through GitHub PR #2.
+  - Local `master` is at merge commit `18457d4`.
+  - User manually tested the demo after merge and reported tests passed.
+- Actions taken:
+  - Reconciled `CODEX.md` with the merged Phase 3 state and Phase 4 handoff.
+  - Updated `agents.md` so current implementation and future target conversion flow are separate.
+  - Added demo deployment model boundary to `README.md`.
+  - Updated `task_plan.md` current phase to Phase 4 and recorded PR3 merge handoff.
+- Next:
+  - Start Phase 4 from latest `master`.
+  - Keep PR5-PR8 scoped to backend completeness rather than model provider plumbing, which is already merged.
