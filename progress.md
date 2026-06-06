@@ -392,3 +392,15 @@
   - Replaced compare-page YAML validation labels with “格式检查/剧本格式”.
   - Updated backend user-facing failure messages so progress errors no longer ask ordinary users to edit env/provider/API settings directly.
   - Added the plain-Chinese user-copy rule to `CODEX.md`, `agents.md`, and `findings.md` for future neat-freak sync.
+
+### PR9 merge sync
+- **Status:** complete
+- Actions taken:
+  - User merged PR9 on GitHub.
+  - Fetched `origin`; `origin/master` advanced to `7d9be12`.
+  - Switched local workspace back to `master` and fast-forwarded it to `origin/master`.
+  - Updated `CODEX.md` from PR9 execution state to PR10 handoff state.
+  - Recorded PR9 merge status in `task_plan.md`.
+- Next:
+  - Start PR10 from `master`.
+  - Scope PR10 to progress page waiting/feedback/preview behavior only.

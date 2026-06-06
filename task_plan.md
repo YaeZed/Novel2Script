@@ -128,6 +128,10 @@ Phase 5
   - `npm.cmd run build`: passed.
   - `git diff --check`: passed; only CRLF normalization warnings.
   - Browser check on `http://127.0.0.1:5173/`: paste/file/sample modes render correctly, file input no longer appears as duplicate control, disabled/enabled submit states work, missing-backend submit error is actionable.
+- Merge:
+  - PR9 merged into `master` on 2026-06-06.
+  - Local `master` fast-forwarded to `origin/master` at `7d9be12`.
+  - Next PR: PR10 progress page.
 
 ## 2026-06-06 PR7 Execution Plan
 
