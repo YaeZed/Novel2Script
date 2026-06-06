@@ -87,6 +87,7 @@
 
 - PR3 已合并到 `master` 后，文档需要从“正在做 Phase 3”切换到“Phase 3 已完成，准备 Phase 4”。
 - `agents.md` 不能把未来目标流程写成当前事实。当前实现是轻量角色表、逐章 Scene 转换、统一 YAML 组装；LLM 角色提取、多章 Act 拼装、retry 和人工标记仍属于 Phase 4。
+- Superseded on 2026-06-06: PR6/PR7 已把当前实现推进到全文来源证据角色表、逐章 Scene 转换、多章 Act 拼装；剩余 Phase 4 目标是 retry 和人工处理标记。
 - 分支约定必须跟仓库实际一致：当前主分支是 `master`，不是 `main`。
 - README 需要明确 demo 版模型切换属于部署管理员边界，用户界面不开放 API key 设置。
 - 下一阶段文档写法原则：先写“当前实现”，再写“后续目标”，避免后续 agent 或评委把 roadmap 当成已交付能力。

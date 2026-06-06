@@ -54,20 +54,20 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 ### 当前转换流程
 1. 接收粘贴文本或 TXT/EPUB 文件，创建 `ConversionTask`
 2. 按章节拆分输入内容
-3. 从对话行中提取一个轻量角色表
+3. 从全文本提取来源证据角色表
 4. 根据 `LLM_PROVIDER` 选择转换器：
    - `placeholder`：本地占位转换，不调用外部模型
    - `anthropic`：Claude API
    - `openai`：OpenAI API
    - `qwen`：阿里千问 DashScope OpenAI-compatible API
-5. 逐章转换为 Scene/Beat，再组装成统一 YAML Schema
-6. 后端 schema 校验通过后保存 YAML、角色表、章节信息
+5. 逐章转换为 Scene/Beat
+6. 按全剧顺序重新编号 Scene，并按开端 / 展开 / 收束组装 Act
+7. 后端 schema 校验通过后保存 YAML、角色表、章节信息
 
 ### 后续目标流程
-1. 全文本 → LLM 角色提取 → 更完整角色表 JSON
-2. 更稳的章节/EPUB 清洗和分块策略
-3. 多章拼装、Act 划分、统一角色名
-4. 质量兜底：解析失败 → 重试 → 标记人工处理
+1. 质量兜底：解析失败 → 重试 → 标记人工处理
+2. 更完整的角色统一策略：别名合并、跨章称呼规范化
+3. 更高级的 Act 大纲：在当前确定性三幕规则上引入可解释的模型级结构建议
 
 ### API 端点
 - `POST /api/convert` → `{task_id}`
@@ -86,6 +86,7 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 - **分支策略**：从最新 `master` 开出 feature 分支，PR 合并后删除
 - **可运行**：`master` 分支任何时刻 `python manage.py runserver` + `npm run dev` 不报错
 - **Commit**：英文 message，描述本次变更
+- **PR 创建**：提交 PR 时直接给 GitHub 创建链接和规范 PR 正文，不检查或依赖本机 `gh`
 - **验证**：改完主动跑 lint/build，不积压错误
 
 ## 依赖清单（用于 README）

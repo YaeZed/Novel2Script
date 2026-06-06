@@ -1,11 +1,11 @@
 # CODEX Guide
 
-## PR7 Current Rule
+## Current Rule
 
-- 当前分支：`codex-phase4-pr7`。
-- 本 PR 只处理多章剧本拼装和 Act 划分：每章转换出的 Scene 统一按全剧顺序编号，再按章节进展合并进 Act。
-- 用户影响：长篇输入不再全部挤在 `Act 1`，作者能按开端、展开、收束浏览和编辑剧本。
-- 不做：LLM retry、解析失败重试、人工处理标记；这些仍属于 PR8。
+- 当前分支：`master`。
+- Phase 4 已完成 PR5-PR7：章节/EPUB 处理、角色提取、prompt grounding、多章拼装和 Act 划分都已合并。
+- 下一步从最新 `master` 新开 PR8 分支，只处理 LLM 解析失败后的 retry 和人工处理标记。
+- 不要在 PR8 里重做 Act 划分策略，除非发现 PR7 的真实回归。
 
 ## 项目定位
 
@@ -13,14 +13,16 @@ AI 小说转剧本工具。用户输入 3 章以上小说文本或 EPUB，系统
 
 ## 当前阶段
 
-Phase 3 已合并到 `master`。当前主分支具备可运行的端到端 demo：
+Phase 4 PR7 已合并到 `master`。当前主分支具备可运行的端到端 demo：
 
 - 默认 `LLM_PROVIDER=placeholder`，无 API key 也能完成本地占位转换。
 - 显式配置 `anthropic` / `openai` / `qwen` 后，后端会调用对应模型把单章小说转换为 Scene/Beat。
+- 后端会先拆分章节/EPUB、提取来源证据角色表，再逐章转换。
+- 多章结果会按全剧顺序重新编号 Scene，并按开端、展开、收束组装为 Act。
 - 进度页会显示当前模型模式；provider 配置错误会显示脱敏后的中文提示。
 - 对照页 YAML 编辑已支持“草稿无效但保留最后一次有效结构”的校验体验。
 
-当前进入 Phase 4 PR7：补齐多章拼装和 Act 划分。PR5 已完成章节/EPUB 处理，PR6 已完成角色提取；PR8 再处理重试和人工处理标记。
+当前进入 Phase 4 PR8：补齐 retry 和人工处理标记。
 
 ## 目录约定
 
@@ -123,6 +125,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 - 每个 PR 只做一件事；大功能拆成多个独立 PR。
 - PR 标题用一句话说明新增或修改了什么。
 - PR 描述必须包含：功能描述、实现思路、测试方式。
+- 提交 PR 时直接给 GitHub 创建链接和规范 PR 正文；不要探测或依赖本机是否安装 `gh`。
 - PR 合并后 `master` 必须保持可运行，评委可随时复现演示效果。
 - 新阶段从最新 `master` 开分支，分支名使用 `codex/<phase-or-feature>`。
 
