@@ -71,6 +71,24 @@
 - `rg` is not executable in this sandbox (`Access denied`), so source search uses PowerShell `Get-ChildItem` + `Select-String`.
 - A broad `Select-String` over `backend` accidentally searched `db.sqlite3` and produced noisy binary output. Future searches should include only source extensions and exclude SQLite files.
 
+## 2026-06-06 PR8 Retry And Manual Review Findings
+
+### Current implementation findings
+- `run_conversion_task` currently builds the scene converter once, then calls `convert_chapter` once per chapter. Any exception bubbles to `ConvertView`, which marks the whole task `failed`.
+- `format_conversion_error` already sanitizes provider/auth/config failures. PR8 should preserve that hard-failure path instead of hiding bad keys behind fallback scenes.
+- The existing script schema permits a normal Scene with a direction beat, so a manual-review placeholder can stay schema-valid without expanding frontend zod validation.
+- The frontend already shows `error_message` on the progress page and allows opening compare only for `completed` tasks. A partial fallback should therefore remain `completed` with a warning message, not introduce a new terminal status.
+
+### Scope decisions
+- Retry belongs at chapter conversion, not around the whole task. A whole-task retry would repeat successful chapters and increase cost/latency.
+- Provider configuration errors before conversion, and authentication errors during conversion, stay non-recoverable. User action is to fix `.env`, not edit a placeholder script.
+- Retry exhaustion produces a scene titled with the original chapter title plus a manual-processing marker, `source_chapter` stays unchanged, and the first beat tells the author what to do next.
+
+### Implementation findings
+- A manual-review scene can stay within the current schema by using normal `title`, `summary`, and `direction`/`action` beats. This avoids frontend validation churn.
+- Unknown Scene fields are not needed for the marker. Keeping the marker in visible standard fields makes the scene rail, YAML editor, and downloaded YAML all self-explanatory.
+- The progress page should treat `completed + error_message` as a warning state, not a red failure state, because the next user action is “open compare and edit marked scenes.”
+
 ## 2026-06-05 Demo Deployment Model Decision
 
 - Demo 版只支持部署管理员通过环境变量切换模型，不在用户界面开放 API key 设置。

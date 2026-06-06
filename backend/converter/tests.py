@@ -562,6 +562,101 @@ class ConversionPipelineTests(TestCase):
         QWEN_API_KEY="",
         ANTHROPIC_MODEL="claude-test",
         LLM_MAX_TOKENS=1000,
+        LLM_SCENE_MAX_ATTEMPTS=2,
+    )
+    def test_pipeline_retries_failed_chapter_conversion(self) -> None:
+        task = ConversionTask.objects.create(
+            input_name="retry.txt",
+            source_text=SAMPLE_TEXT,
+        )
+
+        with patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class:
+            converter = converter_class.return_value
+            converter.convert_chapter.side_effect = [
+                SceneConversionError("LLM response was not valid JSON."),
+                scene_payload(number=1, source_chapter=1, title="\u96e8\u591c\u91cd\u8bd5\u6210\u529f"),
+                scene_payload(number=2, source_chapter=2, title="\u540e\u53f0"),
+            ]
+
+            run_conversion_task(task)
+
+        task.refresh_from_db()
+        self.assertEqual(converter.convert_chapter.call_count, 3)
+        self.assertEqual(task.status, ConversionTask.Status.COMPLETED)
+        self.assertEqual(task.error_message, "")
+        script = yaml.safe_load(task.script_yaml)
+        self.assertEqual(script["acts"][0]["scenes"][0]["title"], "\u96e8\u591c\u91cd\u8bd5\u6210\u529f")
+
+    @override_settings(
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="test-key",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+        ANTHROPIC_MODEL="claude-test",
+        LLM_MAX_TOKENS=1000,
+        LLM_SCENE_MAX_ATTEMPTS=2,
+    )
+    def test_pipeline_marks_chapter_for_manual_review_after_retry_exhaustion(self) -> None:
+        task = ConversionTask.objects.create(
+            input_name="manual-review.txt",
+            source_text=SAMPLE_TEXT,
+        )
+
+        with patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class:
+            converter = converter_class.return_value
+            converter.convert_chapter.side_effect = [
+                SceneConversionError("LLM response was not valid JSON."),
+                SceneConversionError("LLM scene must include at least one beat."),
+                scene_payload(number=2, source_chapter=2, title="\u540e\u53f0"),
+            ]
+
+            run_conversion_task(task)
+
+        task.refresh_from_db()
+        self.assertEqual(converter.convert_chapter.call_count, 3)
+        self.assertEqual(task.status, ConversionTask.Status.COMPLETED)
+        self.assertEqual(task.chapters_done, 2)
+        self.assertIn("\u9700\u4eba\u5de5\u5904\u7406", task.error_message)
+        script = yaml.safe_load(task.script_yaml)
+        scenes = [scene for act in script["acts"] for scene in act["scenes"]]
+        self.assertEqual(scenes[0]["source_chapter"], 1)
+        self.assertIn("\u9700\u4eba\u5de5\u5904\u7406", scenes[0]["title"])
+        self.assertEqual(scenes[0]["beats"][0]["type"], "direction")
+        self.assertIn("\u8bf7\u53c2\u8003\u5de6\u4fa7\u539f\u6587", scenes[0]["beats"][0]["content"])
+        self.assertEqual(scenes[1]["title"], "\u540e\u53f0")
+
+    @override_settings(
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="test-key",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+        ANTHROPIC_MODEL="claude-test",
+        LLM_MAX_TOKENS=1000,
+        LLM_SCENE_MAX_ATTEMPTS=2,
+    )
+    def test_pipeline_does_not_retry_provider_auth_errors(self) -> None:
+        task = ConversionTask.objects.create(
+            input_name="auth-error.txt",
+            source_text=SAMPLE_TEXT,
+        )
+        raw_error = "Error code: 401 - invalid_api_key: Incorrect API key provided."
+
+        with patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class:
+            converter = converter_class.return_value
+            converter.convert_chapter.side_effect = Exception(raw_error)
+
+            with self.assertRaisesMessage(Exception, "invalid_api_key"):
+                run_conversion_task(task)
+
+        self.assertEqual(converter.convert_chapter.call_count, 1)
+
+    @override_settings(
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="test-key",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+        ANTHROPIC_MODEL="claude-test",
+        LLM_MAX_TOKENS=1000,
     )
     def test_pipeline_persists_multi_act_script_for_three_or_more_chapters(self) -> None:
         source_text = (

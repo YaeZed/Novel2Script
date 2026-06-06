@@ -51,6 +51,9 @@ def infer_provider(lowered_message: str) -> str:
 
 
 def is_auth_error(lowered_message: str) -> bool:
+    if "authenticationerror" in lowered_message:
+        return True
+
     auth_markers = [
         "incorrect api key",
         "invalid_api_key",
@@ -59,7 +62,10 @@ def is_auth_error(lowered_message: str) -> bool:
         "unauthorized",
         "401",
     ]
-    return any(marker in lowered_message for marker in auth_markers) and "api key" in lowered_message
+    secret_markers = ["api key", "token", "unauthorized", "401"]
+    return any(marker in lowered_message for marker in auth_markers) and any(
+        marker in lowered_message for marker in secret_markers
+    )
 
 
 def mask_secrets(message: str) -> str:

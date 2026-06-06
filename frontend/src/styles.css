@@ -254,6 +254,26 @@ main {
   color: #b42318;
 }
 
+.status-message {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.status-message[data-kind="warning"] {
+  color: #765100;
+  border: 1px solid #ebd08e;
+  background: #fff7df;
+}
+
+.status-message[data-kind="error"] {
+  color: #a2231a;
+  border: 1px solid #f0b8ad;
+  background: #fff0ed;
+}
+
 .provider-note {
   margin: 14px 0 0;
   color: #52615d;

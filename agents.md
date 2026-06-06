@@ -60,14 +60,15 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
    - `anthropic`：Claude API
    - `openai`：OpenAI API
    - `qwen`：阿里千问 DashScope OpenAI-compatible API
-5. 逐章转换为 Scene/Beat
-6. 按全剧顺序重新编号 Scene，并按开端 / 展开 / 收束组装 Act
-7. 后端 schema 校验通过后保存 YAML、角色表、章节信息
+5. 逐章转换为 Scene/Beat；真实模型输出失败会按配置重试
+6. 重试耗尽后生成“需人工处理”的 schema-valid Scene，认证/key/provider 配置错误仍直接失败
+7. 按全剧顺序重新编号 Scene，并按开端 / 展开 / 收束组装 Act
+8. 后端 schema 校验通过后保存 YAML、角色表、章节信息和必要的人工处理提示
 
 ### 后续目标流程
-1. 质量兜底：解析失败 → 重试 → 标记人工处理
-2. 更完整的角色统一策略：别名合并、跨章称呼规范化
-3. 更高级的 Act 大纲：在当前确定性三幕规则上引入可解释的模型级结构建议
+1. 更完整的角色统一策略：别名合并、跨章称呼规范化
+2. 更高级的 Act 大纲：在当前确定性三幕规则上引入可解释的模型级结构建议
+3. 前端 Phase 5 体验打磨：上传、进度反馈、对照编辑的完整验收
 
 ### API 端点
 - `POST /api/convert` → `{task_id}`

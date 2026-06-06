@@ -17,6 +17,9 @@ const progressLabel = computed(() => {
     return "准备中";
   }
   if (status.value.status === "completed") {
+    if (status.value.error_message) {
+      return "已完成，部分章节待处理";
+    }
     return "已完成";
   }
   if (status.value.status === "failed") {
@@ -67,7 +70,13 @@ onMounted(start);
       </p>
 
       <p v-if="error" class="error-text">{{ error }}</p>
-      <p v-if="status?.error_message" class="error-text">{{ status.error_message }}</p>
+      <p
+        v-if="status?.error_message"
+        class="status-message"
+        :data-kind="status.status === 'completed' ? 'warning' : 'error'"
+      >
+        {{ status.error_message }}
+      </p>
 
       <div class="action-row">
         <button class="secondary-action" type="button" @click="refresh">
