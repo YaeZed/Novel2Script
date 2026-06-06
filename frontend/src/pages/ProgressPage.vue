@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { RouterLink } from "vue-router";
 import { ArrowRight, RefreshCw } from "@lucide/vue";
 
+import AppButton from "../components/AppButton.vue";
+import SectionHeader from "../components/SectionHeader.vue";
 import StatusPill from "../components/StatusPill.vue";
 import { useTaskPolling } from "../composables/useTaskPolling";
 
@@ -31,20 +32,20 @@ const progressLabel = computed(() => {
 const providerLabel = computed(() => {
   const provider = status.value?.llm_provider;
   if (!provider) {
-    return "模式读取中";
+    return "正在读取处理方式";
   }
   if (provider === "placeholder") {
-    return "当前模式：本地占位，不调用外部模型";
+    return "当前处理方式：本地演示，不连接在线智能服务";
   }
   if (provider === "misconfigured") {
-    return "当前模式：模型配置需要修正";
+    return "当前处理方式需要管理员修正";
   }
   const providerNames: Record<string, string> = {
     anthropic: "Anthropic",
     openai: "OpenAI",
     qwen: "阿里千问",
   };
-  return `当前模式：${providerNames[provider] || provider} 真实模型`;
+  return `当前处理方式：${providerNames[provider] || "在线智能服务"}`;
 });
 
 onMounted(start);
@@ -53,13 +54,9 @@ onMounted(start);
 <template>
   <section class="single-column">
     <div class="panel progress-panel">
-      <div class="progress-header">
-        <div>
-          <p class="eyebrow">Task {{ taskId.slice(0, 8) }}</p>
-          <h1>{{ progressLabel }}</h1>
-        </div>
+      <SectionHeader :eyebrow="`Task ${taskId.slice(0, 8)}`" :title="progressLabel">
         <StatusPill v-if="status" :status="status.status" />
-      </div>
+      </SectionHeader>
 
       <div class="meter" aria-label="转换进度">
         <span :style="{ width: `${status?.progress ?? 8}%` }"></span>
@@ -79,18 +76,17 @@ onMounted(start);
       </p>
 
       <div class="action-row">
-        <button class="secondary-action" type="button" @click="refresh">
+        <AppButton variant="secondary" @click="refresh">
           <RefreshCw :size="17" aria-hidden="true" />
           <span>刷新</span>
-        </button>
-        <RouterLink
+        </AppButton>
+        <AppButton
           v-if="isDone && status?.status === 'completed'"
-          class="primary-action"
           :to="`/compare/${taskId}`"
         >
           <ArrowRight :size="18" aria-hidden="true" />
           <span>打开对照</span>
-        </RouterLink>
+        </AppButton>
       </div>
     </div>
   </section>

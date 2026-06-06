@@ -15,21 +15,21 @@ def format_conversion_error(exc: Exception) -> str:
 
     if is_auth_error(lowered):
         return (
-            f"{provider} API key 无效或未授权。请检查 `backend/.env` 里的对应 key，"
-            "修正后重启后端；如果只是本地演示，把 `LLM_PROVIDER=placeholder` 后重启。"
+            f"{provider} 连接凭据无效或未授权。请让管理员检查对应的服务设置，"
+            "修正后重启处理服务；如果只是本地演示，可先切回本地演示方式。"
         )
 
     if "llm_provider" in lowered and "requires its api key" in lowered:
         return (
-            "当前 `LLM_PROVIDER` 指向了未配置 key 的厂商。请补齐对应 API key，"
-            "或改为 `LLM_PROVIDER=placeholder` 后重启后端。"
+            "当前选择的在线智能服务还没有配置连接凭据。请让管理员补齐设置，"
+            "或先切回本地演示方式后重启处理服务。"
         )
 
     if "llm_provider must be one of" in lowered or "unsupported llm_provider" in lowered:
-        return "LLM_PROVIDER 配置不支持。请使用 `auto`、`anthropic`、`openai`、`qwen` 或 `placeholder`。"
+        return "当前选择的处理方式暂不支持。请让管理员改成可用的处理方式后重试。"
 
     if "response was not valid json" in lowered or "scene must include at least one beat" in lowered:
-        return "模型返回的剧本结构不符合要求。请重试；如果持续失败，先切到 `LLM_PROVIDER=placeholder` 验证主流程。"
+        return "生成结果的结构不完整。请重试；如果持续失败，可先切回本地演示方式检查主流程。"
 
     return f"转换失败：{mask_secrets(raw_message)[:500]}"
 
@@ -47,7 +47,7 @@ def infer_provider(lowered_message: str) -> str:
         "anthropic": "Anthropic",
         "openai": "OpenAI",
         "qwen": "阿里千问",
-    }.get(configured_provider, "LLM")
+    }.get(configured_provider, "在线智能服务")
 
 
 def is_auth_error(lowered_message: str) -> bool:

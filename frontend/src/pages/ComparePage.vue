@@ -5,6 +5,8 @@ import { YAMLException, load } from "js-yaml";
 import { ZodError, type ZodIssue } from "zod";
 
 import { getResult, type ResultResponse } from "../api/client";
+import AppButton from "../components/AppButton.vue";
+import SectionHeader from "../components/SectionHeader.vue";
 import { scriptSchema, type ScriptDocument } from "../schemas/script";
 
 const props = defineProps<{
@@ -24,10 +26,10 @@ const lastValidScript = ref<ScriptDocument | null>(null);
 
 const validationTitle = computed(() => {
   if (validationStatus.value === "valid") {
-    return "YAML 有效";
+    return "格式正确";
   }
   if (validationStatus.value === "invalid") {
-    return "YAML 需要修正";
+    return "格式需要修正";
   }
   if (validationStatus.value === "dirty") {
     return "有未校验修改";
@@ -60,7 +62,7 @@ function validateYaml() {
     const parsed = scriptSchema.parse(load(yamlText.value));
     lastValidScript.value = parsed;
     validationStatus.value = "valid";
-    validationDetail.value = "结构符合 Act / Scene / Beat 约定。";
+    validationDetail.value = "剧本结构完整，可以继续编辑。";
   } catch (caught) {
     validationStatus.value = "invalid";
     validationDetail.value = formatValidationError(caught);
@@ -79,14 +81,14 @@ function formatValidationError(caught: unknown) {
     return formatZodIssue(caught.issues[0]);
   }
   if (caught instanceof YAMLException) {
-    return `YAML 语法错误：${caught.reason || caught.message}`;
+    return `文本格式错误：${caught.reason || caught.message}`;
   }
-  return "YAML 无效，请检查缩进、字段名和字段值。";
+  return "剧本格式无效，请检查缩进、字段名和字段值。";
 }
 
 function formatZodIssue(issue: ZodIssue | undefined) {
   if (!issue) {
-    return "剧本结构不符合 Schema。";
+    return "剧本结构不完整。";
   }
 
   const path = issue.path.join(".");
@@ -121,7 +123,7 @@ function humanizePath(path: Array<string | number>) {
       parts.push(`字段 ${segment}`);
     }
   }
-  return parts.join(" / ") || "当前 YAML";
+  return parts.join(" / ") || "当前剧本";
 }
 
 function downloadYaml() {
@@ -312,12 +314,11 @@ onMounted(loadResult);
 <template>
   <section class="compare-layout">
     <aside class="panel scene-rail">
-      <div class="rail-header">
-        <p class="eyebrow">Scenes</p>
-        <button class="icon-button" type="button" aria-label="刷新结果" @click="loadResult">
+      <SectionHeader eyebrow="场景">
+        <AppButton variant="icon" aria-label="刷新结果" @click="loadResult">
           <RefreshCw :size="17" aria-hidden="true" />
-        </button>
-      </div>
+        </AppButton>
+      </SectionHeader>
       <button
         v-for="(scene, index) in scenes"
         :key="`${scene.source_chapter}-${scene.number}`"
@@ -333,30 +334,19 @@ onMounted(loadResult);
 
     <div class="compare-main">
       <div class="panel compare-pane">
-        <div class="pane-header">
-          <div>
-            <p class="eyebrow">原文</p>
-            <h1>{{ currentChapter?.title || "未选择场景" }}</h1>
-          </div>
-        </div>
+        <SectionHeader eyebrow="原文" :title="currentChapter?.title || '未选择场景'" />
         <article ref="sourceTextPane" class="source-text" @scroll="rememberActiveSourceScroll">{{ currentChapter?.text }}</article>
       </div>
 
       <div class="panel compare-pane">
-        <div class="pane-header">
-          <div>
-            <p class="eyebrow">剧本 YAML</p>
-            <h1>{{ validationTitle }}</h1>
-          </div>
-          <div class="toolbar">
-            <button class="icon-button" type="button" aria-label="校验 YAML" @click="validateYaml">
-              <CheckCircle2 :size="17" aria-hidden="true" />
-            </button>
-            <button class="icon-button" type="button" aria-label="下载 YAML" @click="downloadYaml">
-              <Download :size="17" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
+        <SectionHeader eyebrow="剧本" :title="validationTitle">
+          <AppButton variant="icon" aria-label="检查剧本格式" @click="validateYaml">
+            <CheckCircle2 :size="17" aria-hidden="true" />
+          </AppButton>
+          <AppButton variant="icon" aria-label="下载剧本文件" @click="downloadYaml">
+            <Download :size="17" aria-hidden="true" />
+          </AppButton>
+        </SectionHeader>
         <p
           v-if="validationDetail"
           class="validation-note"

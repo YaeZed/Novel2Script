@@ -83,6 +83,7 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 ## 开发约定
 
 - **语言**：代码/命令/变量名用英文，注释/文档/PR 描述用中文
+- **用户文案**：界面和用户可见错误提示尽量不用“前端、后端、API、provider、Schema、YAML、Act、Scene、Beat”等技术词；改成普通作者能理解的中文，如“页面、处理服务、服务、处理方式、剧本格式、剧本文件、幕、场、节拍”
 - **PR 粒度**：每 PR 单一功能，小步提交，参考 task_plan.md 中的 PR 清单
 - **分支策略**：从最新 `master` 开出 feature 分支，PR 合并后删除
 - **可运行**：`master` 分支任何时刻 `python manage.py runserver` + `npm run dev` 不报错
