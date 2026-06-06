@@ -6,6 +6,17 @@
 
 `characters` 仍保持 `name` / `role` / `description` 三列。PR6 起，`description` 会包含简短原文证据，例如对话标记、对白归因或叙述动作出现次数；这不改变前后端 schema，只提高角色表对 prompt 和作者编辑的可用性。
 
+## PR7 Act Assembly Note
+
+PR7 起，后端会在所有章节 Scene 生成后做一次确定性拼装：
+
+- Scene `number` 按全剧顺序连续编号，从 1 开始。
+- Scene `source_chapter` 保留原文章节序号，用于对照页定位原文。
+- 少于 3 个 Scene 时保持单幕：`第一幕：全篇`。
+- 3 个及以上 Scene 时按章节顺序拆为三幕：`第一幕：开端`、`第二幕：展开`、`第三幕：收束`。
+
+这个规则先保证长篇结果可浏览、可编辑；更复杂的模型级 Act 大纲和失败兜底放到后续 PR。
+
 ```yaml
 title: 作品标题
 characters:
@@ -39,8 +50,8 @@ acts:
 | Beat | `content` | 节拍正文 |
 | Beat | `parenthetical` | 括号指示，可选 |
 
-## 第一版策略
+## 转换策略
 
-未配置 LLM key 时，占位转换按章节生成场景，每章前 5 个段落转为 beat。含冒号的段落识别为 dialogue，其余识别为 action。
+未配置 LLM key 时，占位转换按章节生成场景，每章前 5 个段落转为 beat。含真实角色冒号的段落识别为 dialogue，其余识别为 action。
 
-配置 LLM key 后，后端使用所选厂商将单章转换为 Scene JSON，再组装为同一 YAML Schema。当前支持 `anthropic`、`openai`、`qwen`；OpenAI 和千问共用 OpenAI-compatible client。这样前端和用户编辑格式不随生成方式变化。
+配置 LLM key 后，后端使用所选厂商将单章转换为 Scene JSON，再把多章 Scene 组装为同一 YAML Schema。当前支持 `anthropic`、`openai`、`qwen`；OpenAI 和千问共用 OpenAI-compatible client。这样前端和用户编辑格式不随生成方式变化。

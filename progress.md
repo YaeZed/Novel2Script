@@ -284,3 +284,32 @@
   - Local smoke conversion confirmed the two screenshot samples now generate `character: 林照` and `character: 沈岚`.
   - `npm.cmd run build`: passed.
   - `git diff --check`: passed; only CRLF normalization warnings.
+
+## Session: 2026-06-06 Phase 4 PR7 Execution
+
+### PR7: multi-chapter assembly + Act grouping
+- **Status:** complete
+- Actions taken:
+  - Read `planning-with-files` instructions and restored `task_plan.md`, `findings.md`, `progress.md`.
+  - Ran planning session catchup; detected only old initialization context, unrelated to PR7.
+  - Attempted branch `codex/phase4-pr7`; Git could not create the nested ref path in this Windows workspace.
+  - Created working branch `codex-phase4-pr7` with elevated `git switch` after `.git/refs` permission blocked the first attempt.
+  - Read `CODEX.md`, backend pipeline/schema/tests, frontend schema/compare usage, and docs schema.
+  - Updated `CODEX.md`, `task_plan.md`, and `findings.md` with PR7 scope and first-principles design.
+  - Added `script_assembler.py` for deterministic script assembly.
+  - Wired pipeline output through the assembler after per-chapter Scene conversion.
+  - Added unit coverage for multi-act grouping, short-script single-act behavior, global scene numbering, and pipeline YAML persistence.
+  - Updated `README.md` and `docs/schema.md` with Act assembly rules.
+- Current scope:
+  - Normalize generated scenes into continuous full-script numbering.
+  - Group scenes into deterministic Acts while preserving `source_chapter`.
+  - Keep retry/manual-review fallback out of this PR.
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 27 tests.
+  - `npm.cmd run build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+- Errors:
+  - `rg` execution is denied in this sandbox; switched to PowerShell file search.
+  - A broad `Select-String` over `backend` searched `db.sqlite3` and produced binary noise; future searches should filter source extensions.

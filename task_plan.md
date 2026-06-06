@@ -54,7 +54,7 @@ Phase 4
 ### Phase 4: 后端完整功能
 - [x] PR5: 章节拆分 + EPUB 解析
 - [x] PR6: 角色提取 + prompt grounding
-- [ ] PR7: 多章拼装 + Act 合并
+- [x] PR7: 多章拼装 + Act 合并
 - [ ] PR8: 错误兜底（retry + 人工标记）
 - **Status:** pending
 
@@ -96,6 +96,39 @@ Phase 4
 | PR5 English heading test only returned 1 chapter | `python manage.py test` after first splitter patch | Replaced newline-consuming `\s*` heading regex whitespace with line-local whitespace so title matches cannot cross line boundaries |
 
 ## Notes
+
+## 2026-06-06 PR7 Execution Plan
+
+- Problem: PR5/PR6 now produce reliable chapter inputs and source-grounded per-chapter scenes, but the final YAML still puts every scene under a single `Act 1`.
+- User impact: long inputs need a browsable dramatic structure. Authors should see opening / development / resolution sections instead of one flat list.
+- Scope:
+  - Normalize generated scenes so scene numbers are continuous across the full script.
+  - Group scenes into Acts from chapter order using a deterministic backend assembly layer.
+  - Keep scene `source_chapter` intact so compare-page source lookup remains stable.
+  - Document the Act grouping rule in schema docs.
+  - Keep retry and manual-review fallback for PR8.
+- First-principles framing:
+  - The problem is not "make the model understand the whole book" yet; it is "turn already converted chapters into an editable script structure."
+  - The direct path is deterministic assembly after per-chapter conversion, because it is testable and does not add another external model dependency.
+  - From zero, the pipeline boundary would be `chapters -> scenes -> acts -> script YAML`; PR7 implements the missing `scenes -> acts` step.
+- Validation target:
+  - Backend unit tests for multi-act grouping, continuous scene numbering, and pipeline persistence.
+  - `python -m compileall backend`, `python manage.py check`, `python manage.py test`, and frontend build.
+
+## 2026-06-06 PR7 Completion
+
+- Delivered:
+  - Added deterministic script assembly after per-chapter Scene conversion.
+  - Scene `number` is now normalized to full-script sequence order.
+  - `source_chapter` remains unchanged for compare-page original text lookup.
+  - Scripts with fewer than 3 scenes stay in `第一幕：全篇`; scripts with 3+ scenes split into `第一幕：开端` / `第二幕：展开` / `第三幕：收束`.
+  - Updated schema docs, README, and PR7 project rules.
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 27 tests.
+  - `npm.cmd run build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
 
 ## 2026-06-05 PR6 Execution Plan
 

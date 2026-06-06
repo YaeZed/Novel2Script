@@ -52,6 +52,25 @@
 ## Visual/Browser Findings
 -
 
+## 2026-06-06 PR7 Multi-Chapter Assembly Findings
+
+### First-principles framing
+- The current missing product value is structure, not another generation pass. Once chapters already become scenes, the user needs a script-shaped outline that can be scanned and edited.
+- The shortest reliable path is deterministic assembly after scene generation: preserve chapter order, renumber scenes globally, then split scenes into Acts.
+- A model-generated act outline is deferred. It could be richer, but it adds cost, latency, and failure modes before retry/manual-review fallback exists.
+
+### Scope decisions
+- PR7 should keep `source_chapter` stable. The compare page uses that field to find the original chapter text, so Act grouping must not change it.
+- Scene `number` should become a global script number, not a per-chapter number. This makes the scene rail easier to scan and avoids repeated `1` values if later a chapter creates multiple scenes.
+- Inputs with fewer than 3 scenes should stay in a single Act. Three or more scenes use a simple three-act split: opening, development, resolution.
+- PR7 does not add retry, partial failure state, or manual processing markers. Those belong to PR8.
+
+### Environment findings
+- Creating branch `codex/phase4-pr7` failed because Git could not create the nested ref path.
+- Creating `codex-phase4-pr7` first failed on `.git/refs` permission, then succeeded with elevated `git switch`.
+- `rg` is not executable in this sandbox (`Access denied`), so source search uses PowerShell `Get-ChildItem` + `Select-String`.
+- A broad `Select-String` over `backend` accidentally searched `db.sqlite3` and produced noisy binary output. Future searches should include only source extensions and exclude SQLite files.
+
 ## 2026-06-05 Demo Deployment Model Decision
 
 - Demo 版只支持部署管理员通过环境变量切换模型，不在用户界面开放 API key 设置。
