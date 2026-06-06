@@ -22,6 +22,7 @@ Phase 5
 | PR8 | 错误兜底：解析 → 重试 → 标记人工处理 | 2 commits | Phase 4 |
 | PR9 | 前端上传页（三种输入方式） | 2 commits | Phase 5 |
 | PR10 | 前端进度页（轮询 + 逐章预览） | 2 commits | Phase 5 |
+| PR10.1 | 长文处理中查看已处理章节 + 对照页增量更新 | 1-2 commits | Phase 5 |
 | PR11 | 前端对照视图（按场对齐 + 内联编辑） | 2-3 commits | Phase 5 |
 | PR12 | 深浅护眼模式 + 阅读体验打磨 | 1-2 commits | Phase 6 |
 | PR13 | 剧本 YAML Schema 文档 | 1 commit | Phase 6 |
@@ -60,7 +61,8 @@ Phase 5
 
 ### Phase 5: 前端全部页面
 - [x] PR9: 上传页
-- [ ] PR10: 进度页
+- [x] PR10: 进度页
+- [ ] PR10.1: 长文处理中查看已处理章节 + 对照页增量更新
 - [ ] PR11: 对照视图
 - **Status:** in_progress
 
@@ -132,6 +134,57 @@ Phase 5
   - PR9 merged into `master` on 2026-06-06.
   - Local `master` fast-forwarded to `origin/master` at `7d9be12`.
   - Next PR: PR10 progress page.
+
+## 2026-06-06 PR10 Execution Plan
+
+- Problem: 当前提交接口会等转换结束才返回任务号，进度页只能显示完成结果，不能承担“等待、确认任务还在推进、按章预览”的产品职责。
+- User impact: 作者提交长文本后应该马上进入进度页，看到素材已接收、当前阶段、处理到哪一章，以及完成后清楚进入对照编辑；失败时也要知道下一步是重试还是联系管理员检查服务。
+- Scope:
+  - 后端最小调整为提交后立即返回任务号，并在本进程后台执行现有转换流程。
+  - 章节拆分完成后尽早保存章节标题和摘录，供进度页逐章预览。
+  - 扩展状态接口返回任务名、来源类型和章节预览，不改变结果接口和对照页编辑逻辑。
+  - 重做进度页布局、阶段反馈、章节列表、完成/失败下一步动作；样式继续对齐 PR9 的按钮、标题、面板和普通中文文案。
+  - 不引入 Celery/队列服务，不改 LLM provider、retry、Act 组装或对照页 YAML 编辑。
+- First-principles framing:
+  - 要解决的问题不是“显示百分比”，而是“让用户等待时有确定感，并知道任务是否还活着”。
+  - 最直接路径是把提交、处理、状态读取拆开：`submit -> task id -> polling -> compare`。
+  - 从零设计会把章节作为进度页的主要反馈单位，因为小说转换天然按章推进，百分比只是辅助。
+- Validation target:
+  - 后端测试覆盖提交后返回 pending/processing、后台失败会写入脱敏错误、状态接口返回章节预览。
+  - `python -m compileall backend`, `python manage.py check`, `python manage.py test`, `npm.cmd run build`, `git diff --check`。
+
+## 2026-06-06 PR10 Completion
+
+- Delivered:
+  - 提交接口改为创建任务后立即返回 `task_id`，后台线程继续执行现有转换流程。
+  - 后台执行失败时继续写入脱敏中文错误，并把任务标记为失败。
+  - 章节拆分完成后立即保存章节标题和摘录，状态接口返回任务名、来源类型、章节进度和预览，不返回整章原文。
+  - 进度页改为双栏工作台：主进度、来源/章节/处理方式、下一步提示、异常提示和逐章预览列表。
+  - 轮询失败提示改为可行动中文，完成后进入对照，失败后返回重新提交。
+  - 样式与 PR9 对齐：共享按钮/标题、8px 面板、低饱和绿灰主色、移动端单列。
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 33 tests.
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+  - Django client smoke test with temporary `LLM_PROVIDER=placeholder`: `POST /api/convert` returned immediately, status progressed to `completed`, status chapter payload only contained `index/title/excerpt`, result returned script content.
+
+## 2026-06-06 PR10.1 Planned Follow-Up
+
+- Problem: 长文章转换时间较长时，进度页只能等待，用户无法先查看已经处理完成的章节，也无法在等待期间开始对照检查。
+- User impact: 作者应该能在任务还没完全完成时进入对照页查看已完成草稿；后续章节完成后自动补进来，但不能打断用户当前阅读、选中场景或正在编辑的剧本文本。
+- Scope:
+  - 进度页在“刷新”右侧增加“查看已处理”入口；只要已有可查看草稿就允许进入对照页。
+  - 后端每完成一个处理段就保存一次当前可用的剧本草稿和角色表，让结果接口在处理中也能返回已处理章节。
+  - 对照页顶部显示处理进度条和当前状态。
+  - 对照页轮询状态和结果，发现新增场景时以最小干扰方式更新：用户未改动草稿时自动替换；用户有未校验/未保存编辑时只提示有新内容，不覆盖编辑区。
+  - 不在本次引入多人协作、编辑保存接口、差异合并器或队列系统。
+- First-principles framing:
+  - 要解决的问题不是“多一个页面入口”，而是“长任务期间已经产生的价值不应该被锁在等待页里”。
+  - 最直接路径是让 pipeline 按章节持久化 partial script，让 compare 页消费同一个 result/status 契约。
+  - 从零设计会把转换产物视为可增长草稿：`processed scenes -> partial script -> editor`，新增内容只能在不破坏用户当前编辑上下文的前提下进入。
 
 ## 2026-06-06 PR7 Execution Plan
 

@@ -167,6 +167,62 @@ class EpubParserTests(TestCase):
         chapters = split_chapters(text)
         self.assertEqual([chapter.title for chapter in chapters], ["第1章 Rain Night", "第2章 Backstage"])
 
+    def test_skips_epub_front_and_back_matter(self) -> None:
+        copyright_page = FakeEpubItem(
+            "copyright",
+            "item1.xhtml",
+            "<html><body><p>版权信息</p><p>书名：且听风吟（2023修订版）</p><p>作者：村上春树</p></body></html>",
+        )
+        digital_lab = FakeEpubItem(
+            "intro",
+            "item2.xhtml",
+            "<html><body><p>Digital Lab是上海译文出版社数字业务的实验部门。</p><p>上海译文出版社｜Digital Lab</p></body></html>",
+        )
+        translator_preface = FakeEpubItem(
+            "preface",
+            "item3.xhtml",
+            "<html><body><p>一切都将一去杳然（译序）</p><p>林少华</p><p>这部小说是村上春树的处女作。</p></body></html>",
+        )
+        first = FakeEpubItem(
+            "story-1",
+            "item4.xhtml",
+            "<html><body><p>且听风吟</p><p>1</p><p>“不存在十全十美的文章。”</p></body></html>",
+        )
+        second = FakeEpubItem(
+            "story-2",
+            "item5.xhtml",
+            "<html><body><p>2</p><p>故事从一九七〇年八月八日开始。</p></body></html>",
+        )
+        chronology = FakeEpubItem(
+            "chronology",
+            "item6.xhtml",
+            "<html><body><p>村上春树年谱</p><p>1949年 1月12日出生。</p></body></html>",
+        )
+        music = FakeEpubItem(
+            "music",
+            "item7.xhtml",
+            "<html><body><p>《且听风吟》音乐列表</p><p>California Girls</p></body></html>",
+        )
+        items = [copyright_page, digital_lab, translator_preface, first, second, chronology, music]
+        book = FakeEpubBook(
+            items=items,
+            spine=[(item.get_id(), "yes") for item in items],
+        )
+
+        with patch("converter.services.epub_parser.epub.read_epub", return_value=book):
+            text = extract_epub_text(b"fake epub bytes")
+
+        chapters = split_chapters(text)
+
+        self.assertEqual(len(chapters), 2)
+        self.assertEqual([chapter.title for chapter in chapters], ["第1章 EPUB 章节 1", "第2章 EPUB 章节 2"])
+        self.assertIn("不存在十全十美", chapters[0].text)
+        self.assertIn("一九七〇年", chapters[1].text)
+        self.assertNotIn("版权信息", text)
+        self.assertNotIn("译序", text)
+        self.assertNotIn("年谱", text)
+        self.assertNotIn("音乐列表", text)
+
 
 class FakeClaudeMessages:
     def __init__(self, response_text: str) -> None:
@@ -328,41 +384,50 @@ class ConversionApiTests(TestCase):
         OPENAI_API_KEY="",
         QWEN_API_KEY="",
     )
-    def test_convert_text_uses_placeholder_generator_without_api_key(self) -> None:
-        created = self.client.post("/api/convert", {"text": SAMPLE_TEXT})
+    def test_convert_text_returns_task_before_background_conversion_finishes(self) -> None:
+        with patch("converter.views.start_conversion_task") as start_task:
+            created = self.client.post("/api/convert", {"text": SAMPLE_TEXT})
 
         self.assertEqual(created.status_code, 201)
         task_id = created.json()["task_id"]
+        task = ConversionTask.objects.get(id=task_id)
+        start_task.assert_called_once_with(task)
+
         status_response = self.client.get(f"/api/status/{task_id}")
-        result_response = self.client.get(f"/api/result/{task_id}")
 
-        self.assertEqual(status_response.json()["status"], "completed")
+        self.assertEqual(status_response.json()["status"], "pending")
         self.assertEqual(status_response.json()["llm_provider"], "placeholder")
-        result = result_response.json()
-        self.assertEqual(result["status"], "completed")
-        self.assertIn("script_yaml", result)
-        self.assertEqual(result["characters"][0]["name"], "\u6797\u7167")
+        self.assertEqual(status_response.json()["input_name"], "pasted-text.txt")
 
-    def test_convert_failure_sanitizes_provider_auth_error(self) -> None:
+    def test_background_runner_sanitizes_provider_auth_error(self) -> None:
         raw_error = (
             "Error code: 401 - {'error': {'message': 'Incorrect API key provided: "
             "sk_a79fb********************************52c8. You can find your API key at "
             "https://platform.openai.com/account/api-keys.', 'code': 'invalid_api_key'}}"
         )
 
-        with patch("converter.views.run_conversion_task", side_effect=Exception(raw_error)):
-            created = self.client.post("/api/convert", {"text": SAMPLE_TEXT})
+        task = ConversionTask.objects.create(input_name="bad-key.txt", source_text=SAMPLE_TEXT)
 
-        task_id = created.json()["task_id"]
-        status_response = self.client.get(f"/api/status/{task_id}")
+        with patch("converter.services.task_runner.run_conversion_task", side_effect=Exception(raw_error)):
+            from converter.services.task_runner import _run_and_capture_failure
+
+            _run_and_capture_failure(task.id)
+
+        status_response = self.client.get(f"/api/status/{task.id}")
         error_message = status_response.json()["error_message"]
 
         self.assertEqual(status_response.json()["status"], "failed")
+        self.assertEqual(status_response.json()["progress"], 100)
         self.assertIn("OpenAI 连接凭据无效", error_message)
         self.assertIn("本地演示方式", error_message)
         self.assertNotIn("sk_a79fb", error_message)
         self.assertNotIn("platform.openai.com", error_message)
         self.assertNotIn("invalid_api_key", error_message)
+
+    def test_background_runner_ignores_missing_task(self) -> None:
+        from converter.services.task_runner import _run_and_capture_failure
+
+        _run_and_capture_failure("00000000-0000-0000-0000-000000000000")
 
     @override_settings(
         LLM_PROVIDER="qwen",
@@ -383,6 +448,33 @@ class ConversionApiTests(TestCase):
 
         self.assertEqual(status_response.status_code, 200)
         self.assertEqual(status_response.json()["llm_provider"], "misconfigured")
+
+    @override_settings(
+        LLM_PROVIDER="auto",
+        ANTHROPIC_API_KEY="",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+    )
+    def test_status_includes_chapter_previews_after_pipeline_starts(self) -> None:
+        task = ConversionTask.objects.create(
+            input_name="sample.txt",
+            source_format=ConversionTask.SourceFormat.TEXT,
+            source_text=SAMPLE_TEXT,
+        )
+
+        run_conversion_task(task)
+
+        status_response = self.client.get(f"/api/status/{task.id}")
+        payload = status_response.json()
+
+        self.assertEqual(payload["status"], "completed")
+        self.assertEqual(payload["input_name"], "sample.txt")
+        self.assertEqual(payload["source_format"], "text")
+        self.assertEqual(payload["total_chapters"], 2)
+        self.assertEqual(len(payload["chapters"]), 2)
+        self.assertEqual(payload["chapters"][0]["title"], "\u7b2c\u4e00\u7ae0 \u96e8\u591c")
+        self.assertIn("\u6797\u7167", payload["chapters"][0]["excerpt"])
+        self.assertNotIn("text", payload["chapters"][0])
 
 
 class ConversionPipelineTests(TestCase):

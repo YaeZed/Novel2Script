@@ -24,15 +24,19 @@ class ConversionCreatedSerializer(serializers.Serializer):
 
 class ConversionStatusSerializer(serializers.ModelSerializer):
     llm_provider = serializers.SerializerMethodField()
+    chapters = serializers.SerializerMethodField()
 
     class Meta:
         model = ConversionTask
         fields = [
             "id",
+            "input_name",
+            "source_format",
             "status",
             "progress",
             "chapters_done",
             "total_chapters",
+            "chapters",
             "error_message",
             "llm_provider",
         ]
@@ -42,6 +46,16 @@ class ConversionStatusSerializer(serializers.ModelSerializer):
             return resolve_llm_provider()
         except ValueError:
             return "misconfigured"
+
+    def get_chapters(self, obj):
+        return [
+            {
+                "index": chapter.get("index"),
+                "title": chapter.get("title", ""),
+                "excerpt": chapter.get("excerpt", ""),
+            }
+            for chapter in obj.chapters
+        ]
 
 
 class ConversionResultSerializer(serializers.ModelSerializer):
