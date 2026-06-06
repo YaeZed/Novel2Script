@@ -59,10 +59,10 @@ Phase 5
 - **Status:** complete
 
 ### Phase 5: 前端全部页面
-- [ ] PR9: 上传页
+- [x] PR9: 上传页
 - [ ] PR10: 进度页
 - [ ] PR11: 对照视图
-- **Status:** pending
+- **Status:** in_progress
 
 ### Phase 6: 打磨 + 部署 + 文档
 - [ ] PR12: 深浅模式 + 阅读体验
@@ -96,6 +96,38 @@ Phase 5
 | PR5 English heading test only returned 1 chapter | `python manage.py test` after first splitter patch | Replaced newline-consuming `\s*` heading regex whitespace with line-local whitespace so title matches cannot cross line boundaries |
 
 ## Notes
+
+## 2026-06-06 PR9 Execution Plan
+
+- Problem: 当前上传页仍停留在骨架层，能提交但没有把三种输入方式、素材状态和开始转换动作组织成稳定的产品入口。
+- User impact: 作者进入产品后应该马上知道“把文本/文件放进来，然后开始转换”，不需要理解后端 provider、Schema 或部署细节。
+- Scope:
+  - 打磨上传页三种输入方式：粘贴、TXT/EPUB 文件、示例。
+  - 提供清晰的素材状态反馈：字数、文件名/类型、示例预览。
+  - 把按钮和区块标题抽成可复用组件，并让进度页/对照页使用同一套基础控件。
+  - 优化上传页响应式布局、焦点态、禁用态和提交错误提示。
+  - 不改后端转换流程，不扩展进度页和对照页的业务行为。
+- First-principles framing:
+  - 要解决的问题不是“做一个首页”，而是“让用户把素材可靠交给转换系统”。
+  - 最直接路径是以输入方式为主控件，页面只保留完成提交所需的信息和动作。
+  - 从零设计会先确定 `input mode -> source readiness -> submit` 的交互闭环，再决定视觉布局；说明文字只在能减少误操作时出现。
+- Validation target:
+  - `npm.cmd run build`。
+  - 浏览器手测上传页三种输入模式、禁用态、提交跳转和移动端布局。
+
+## 2026-06-06 PR9 Completion
+
+- Delivered:
+  - 上传页改为输入工作台：粘贴、文件、示例三种模式共享同一条素材就绪和提交路径。
+  - 增加素材状态反馈：文本字数、文件名/大小、输入预览和下一步提示。
+  - 文件模式隐藏原生 input，只暴露“选择文件/更换文件”这一条清晰操作。
+  - 提交失败改为可行动中文提示，后端未启动时提示用户确认 API 服务。
+  - 新增 `AppButton` 和 `SectionHeader` 基础组件，并让上传页、进度页、对照页使用同一套按钮/标题结构。
+  - 调整全局样式的按钮、分段控件、焦点态、面板和响应式布局，上传页不再读成营销首页。
+- Validation:
+  - `npm.cmd run build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+  - Browser check on `http://127.0.0.1:5173/`: paste/file/sample modes render correctly, file input no longer appears as duplicate control, disabled/enabled submit states work, missing-backend submit error is actionable.
 
 ## 2026-06-06 PR7 Execution Plan
 

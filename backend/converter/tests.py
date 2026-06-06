@@ -358,8 +358,8 @@ class ConversionApiTests(TestCase):
         error_message = status_response.json()["error_message"]
 
         self.assertEqual(status_response.json()["status"], "failed")
-        self.assertIn("OpenAI API key 无效", error_message)
-        self.assertIn("LLM_PROVIDER=placeholder", error_message)
+        self.assertIn("OpenAI 连接凭据无效", error_message)
+        self.assertIn("本地演示方式", error_message)
         self.assertNotIn("sk_a79fb", error_message)
         self.assertNotIn("platform.openai.com", error_message)
         self.assertNotIn("invalid_api_key", error_message)

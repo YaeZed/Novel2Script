@@ -52,6 +52,30 @@
 ## Visual/Browser Findings
 -
 
+## 2026-06-06 PR9 Upload Page Findings
+
+### First-principles framing
+- 上传页的核心任务是收集素材并启动转换，不是展示产品卖点。首屏应直接呈现输入控件和主操作。
+- 三种输入方式本质上是同一个提交合同：最终向 `/api/convert` 提供 `text` 或 `file`。前端应该围绕“素材是否就绪”组织状态，而不是把三种模式拆成三套视觉系统。
+- 用户不需要在上传页理解模型 provider、Act/Scene/Beat 细节或 YAML 校验；这些信息会在进度页和对照页承担。
+
+### Scope decisions
+- PR9 保留粘贴、文件、示例三种入口。示例入口有价值，因为无素材时也能完成端到端验收。
+- 上传页只显示与当前动作有关的短反馈：文本字数、文件名/类型、示例章节数量、提交错误。
+- 可复用组件只抽基础按钮和标题区。现在抽表单框架或复杂布局会过早泛化，因为 PR10/PR11 还会继续暴露真实复用点。
+- 进度页/对照页可以切到新基础组件，但不在 PR9 深改它们的业务体验。
+- 用户界面和用户可见错误提示不能直接暴露“前端、后端、API、provider、Schema、YAML、Act、Scene、Beat”等技术词。普通作者只需要知道当前页面、处理服务、剧本格式、处理方式和下一步动作。
+
+### Current implementation findings
+- 当前分支已有草稿：`AppButton.vue`、`SectionHeader.vue`，以及进度页/对照页的局部组件替换。
+- `ConvertView` 接受 `text` 或 `file`，EPUB 通过文件名后缀识别；非 EPUB 文件按 UTF-8 文本读取。
+- 前端 `createConversion` 使用 `FormData`，因此上传页只需要确保同一时间提交一种有效输入。
+- 当前上传页文案和布局过薄，缺少素材状态反馈；右侧 YAML 预览是静态装饰，应该改成更有任务感的结果摘要。
+
+### Environment findings
+- `rg` 在此 Windows 沙箱继续被拒绝执行；源码搜索使用 `Get-ChildItem` + `Select-String`。
+- 标准嵌套分支名 `codex/phase-5-pr9-upload-page` 无法创建 ref 目录；已使用 `codex-phase-5-pr9-upload-page`。
+
 ## 2026-06-06 PR7 Multi-Chapter Assembly Findings
 
 ### First-principles framing

@@ -355,3 +355,40 @@
   - Updated `task_plan.md` current phase to Phase 5 after PR8 completion.
 - Validation:
   - Root docs remain under size limits: `CODEX.md` 145 lines, `agents.md` 122 lines, `docs/schema.md` 68 lines.
+
+## Session: 2026-06-06 Phase 5 PR9 Execution
+
+### PR9: upload page
+- **Status:** complete
+- Actions taken:
+  - Read `planning-with-files` instructions and restored `task_plan.md`, `findings.md`, `progress.md`.
+  - Ran session catchup; detected only old initialization context, unrelated to PR9.
+  - Found existing uncommitted frontend draft on `master`: upload/progress/compare pages already partially switched to `AppButton` and `SectionHeader`.
+  - Created working branch `codex-phase-5-pr9-upload-page` after nested `codex/...` branch creation failed in this Windows workspace.
+  - Inspected upload page, progress page, compare page, frontend API client, shared styles, and backend convert serializer/view.
+  - Recorded PR9 scope in `CODEX.md`, `task_plan.md`, and `findings.md`.
+  - Reworked upload page around `mode -> source readiness -> submit`: paste, TXT/EPUB file, and sample modes now share one clear submission path.
+  - Added source readiness feedback, text/file preview, file-size display, and Chinese actionable submit-error formatting.
+  - Added reusable `AppButton.vue` and `SectionHeader.vue`, then aligned progress and compare page headers/actions to those components.
+  - Updated global styles for shared controls, upload layout, focus states, hidden file input, cooler neutral page background, and mobile stacking.
+- Current scope:
+  - Polish upload page input workflow and visual hierarchy.
+  - Reuse only the basic button/header components needed across existing pages.
+  - Keep backend conversion and later Phase 5 page behavior unchanged.
+- Errors:
+  - `rg` execution is denied in this sandbox; using PowerShell source search.
+  - `git switch -c codex/phase-5-pr9-upload-page` failed because Git could not create the nested ref path.
+  - `git switch -c codex-phase-5-pr9-upload-page` first failed on `.git/refs` permission, then succeeded with elevated permission.
+- Validation:
+  - `npm.cmd run build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+  - Browser check on `http://127.0.0.1:5173/`: paste/file/sample modes rendered correctly; file mode no longer exposes a duplicate native file button; missing-backend submit error now says to confirm the API is running.
+
+### PR9 user-copy cleanup
+- **Status:** complete
+- Actions taken:
+  - Replaced user-visible technical wording on the upload page with plain Chinese: `YAML` became 剧本文件/剧本初稿, `API/backend` became 服务/处理服务, and preview labels became Chinese.
+  - Replaced progress-page model/provider wording with “处理方式”.
+  - Replaced compare-page YAML validation labels with “格式检查/剧本格式”.
+  - Updated backend user-facing failure messages so progress errors no longer ask ordinary users to edit env/provider/API settings directly.
+  - Added the plain-Chinese user-copy rule to `CODEX.md`, `agents.md`, and `findings.md` for future neat-freak sync.
