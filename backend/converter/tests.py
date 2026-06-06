@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import yaml
 from django.test import TestCase, override_settings
 from ebooklib import ITEM_DOCUMENT
 
@@ -15,6 +16,7 @@ from converter.services.llm_scene_converter import (
     build_chapter_prompt,
 )
 from converter.services.pipeline import PlaceholderSceneConverter, build_scene_converter, run_conversion_task
+from converter.services.script_assembler import assemble_script
 
 
 SAMPLE_TEXT = (
@@ -384,6 +386,41 @@ class ConversionApiTests(TestCase):
 
 
 class ConversionPipelineTests(TestCase):
+    def test_assemble_script_groups_three_or_more_scenes_into_acts(self) -> None:
+        scenes = [
+            scene_payload(number=99, source_chapter=1, title="\u96e8\u591c"),
+            scene_payload(number=99, source_chapter=2, title="\u540e\u53f0"),
+            scene_payload(number=99, source_chapter=3, title="\u51b7\u5149"),
+            scene_payload(number=99, source_chapter=4, title="\u8ffd\u95ee"),
+            scene_payload(number=99, source_chapter=5, title="\u771f\u76f8"),
+        ]
+
+        script = assemble_script(title="\u6837\u672c", characters=[], scenes=scenes)
+
+        self.assertEqual([act["number"] for act in script["acts"]], [1, 2, 3])
+        self.assertEqual(
+            [act["title"] for act in script["acts"]],
+            ["\u7b2c\u4e00\u5e55\uff1a\u5f00\u7aef", "\u7b2c\u4e8c\u5e55\uff1a\u5c55\u5f00", "\u7b2c\u4e09\u5e55\uff1a\u6536\u675f"],
+        )
+        self.assertEqual([len(act["scenes"]) for act in script["acts"]], [1, 3, 1])
+        all_scenes = [scene for act in script["acts"] for scene in act["scenes"]]
+        self.assertEqual([scene["number"] for scene in all_scenes], [1, 2, 3, 4, 5])
+        self.assertEqual([scene["source_chapter"] for scene in all_scenes], [1, 2, 3, 4, 5])
+
+    def test_assemble_script_keeps_short_scripts_in_one_act(self) -> None:
+        script = assemble_script(
+            title="\u6837\u672c",
+            characters=[],
+            scenes=[
+                scene_payload(number=8, source_chapter=1, title="\u96e8\u591c"),
+                scene_payload(number=9, source_chapter=2, title="\u540e\u53f0"),
+            ],
+        )
+
+        self.assertEqual(len(script["acts"]), 1)
+        self.assertEqual(script["acts"][0]["title"], "\u7b2c\u4e00\u5e55\uff1a\u5168\u7bc7")
+        self.assertEqual([scene["number"] for scene in script["acts"][0]["scenes"]], [1, 2])
+
     def test_placeholder_filters_metadata_dialogue_with_character_table(self) -> None:
         converter = PlaceholderSceneConverter()
         chapter = Chapter(
@@ -513,7 +550,47 @@ class ConversionPipelineTests(TestCase):
         self.assertIn("\u539f\u6587\u8bc1\u636e", passed_characters[0]["description"])
         self.assertEqual(task.status, "completed")
         self.assertEqual(task.chapters_done, 2)
-        self.assertIn("\u96e8\u591c\u5bf9\u5cd9", task.script_yaml)
+        script = yaml.safe_load(task.script_yaml)
+        self.assertEqual(script["acts"][0]["title"], "\u7b2c\u4e00\u5e55\uff1a\u5168\u7bc7")
+        self.assertEqual([scene["number"] for scene in script["acts"][0]["scenes"]], [1, 2])
+        self.assertEqual(script["acts"][0]["scenes"][0]["title"], "\u96e8\u591c\u5bf9\u5cd9")
+
+    @override_settings(
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="test-key",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+        ANTHROPIC_MODEL="claude-test",
+        LLM_MAX_TOKENS=1000,
+    )
+    def test_pipeline_persists_multi_act_script_for_three_or_more_chapters(self) -> None:
+        source_text = (
+            "\u7b2c\u4e00\u7ae0 \u96e8\u591c\n\u6797\u7167\uff1a\u5f00\u95e8\u3002\n\n"
+            "\u7b2c\u4e8c\u7ae0 \u540e\u53f0\n\u6c88\u5c9a\uff1a\u542c\u89c1\u4e86\u5417\uff1f\n\n"
+            "\u7b2c\u4e09\u7ae0 \u51b7\u5149\n\u706f\u5149\u4ece\u95e8\u7f1d\u91cc\u900f\u51fa\u3002\n"
+        )
+        task = ConversionTask.objects.create(input_name="three.txt", source_text=source_text)
+
+        with patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class:
+            converter = converter_class.return_value
+            converter.convert_chapter.side_effect = [
+                scene_payload(number=10, source_chapter=1, title="\u96e8\u591c"),
+                scene_payload(number=10, source_chapter=2, title="\u540e\u53f0"),
+                scene_payload(number=10, source_chapter=3, title="\u51b7\u5149"),
+            ]
+
+            run_conversion_task(task)
+
+        task.refresh_from_db()
+        self.assertEqual(task.status, "completed")
+        script = yaml.safe_load(task.script_yaml)
+        self.assertEqual(
+            [act["title"] for act in script["acts"]],
+            ["\u7b2c\u4e00\u5e55\uff1a\u5f00\u7aef", "\u7b2c\u4e8c\u5e55\uff1a\u5c55\u5f00", "\u7b2c\u4e09\u5e55\uff1a\u6536\u675f"],
+        )
+        all_scenes = [scene for act in script["acts"] for scene in act["scenes"]]
+        self.assertEqual([scene["number"] for scene in all_scenes], [1, 2, 3])
+        self.assertEqual([scene["source_chapter"] for scene in all_scenes], [1, 2, 3])
 
     @override_settings(
         LLM_PROVIDER="qwen",
@@ -562,3 +639,13 @@ class ConversionPipelineTests(TestCase):
             max_tokens=1000,
             json_mode=True,
         )
+
+
+def scene_payload(number: int, source_chapter: int, title: str) -> dict[str, object]:
+    return {
+        "number": number,
+        "title": title,
+        "source_chapter": source_chapter,
+        "summary": f"{title}\u6458\u8981",
+        "beats": [{"type": "action", "content": f"{title}\u53d1\u751f\u3002"}],
+    }

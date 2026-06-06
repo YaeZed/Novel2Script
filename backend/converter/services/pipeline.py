@@ -8,7 +8,8 @@ from converter.services.llm_scene_converter import (
     OpenAICompatibleSceneConverter,
     SceneConverter,
 )
-from schema.script_schema import build_scene, build_script, dump_script_yaml, validate_script
+from converter.services.script_assembler import assemble_script
+from schema.script_schema import build_scene, dump_script_yaml, validate_script
 
 
 def run_conversion_task(task: ConversionTask) -> None:
@@ -32,9 +33,8 @@ def run_conversion_task(task: ConversionTask) -> None:
         task.progress = conversion_progress(len(scenes), len(chapters))
         task.save(update_fields=["chapters_done", "progress", "updated_at"])
 
-    script = build_script(
+    script = assemble_script(
         title=task.input_name or "Untitled",
-        chapters=chapter_payloads,
         characters=characters,
         scenes=scenes,
     )

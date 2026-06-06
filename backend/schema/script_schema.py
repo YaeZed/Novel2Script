@@ -128,14 +128,15 @@ def build_script(
     characters: list[dict[str, str]],
     scenes: list[dict[str, object]] | None = None,
 ) -> ScriptDict:
+    scene_payloads = scenes if scenes is not None else [build_scene(chapter) for chapter in chapters]
     return {
         "title": title,
         "characters": characters,
         "acts": [
             {
                 "number": 1,
-                "title": "Act 1",
-                "scenes": scenes if scenes is not None else [build_scene(chapter) for chapter in chapters],
+                "title": "\u7b2c\u4e00\u5e55\uff1a\u5168\u7bc7",
+                "scenes": scene_payloads,
             }
         ],
     }
