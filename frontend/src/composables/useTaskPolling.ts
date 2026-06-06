@@ -18,7 +18,7 @@ export function useTaskPolling(taskId: string) {
         stop();
       }
     } catch (caught) {
-      error.value = caught instanceof Error ? caught.message : "状态读取失败";
+      error.value = "暂时读不到处理进度，请确认处理服务已打开，稍后再刷新。";
     }
   }
 

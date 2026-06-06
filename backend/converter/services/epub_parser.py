@@ -44,6 +44,16 @@ HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6", "title"}
 SKIP_TAGS = {"script", "style"}
 AUXILIARY_NAME_PARTS = ("cover", "copyright", "nav", "toc")
 AUXILIARY_TITLES = {"目录", "目錄", "table of contents", "contents", "copyright"}
+NON_STORY_TITLE_PARTS = (
+    "版权信息",
+    "版权申明",
+    "版权声明",
+    "出版说明",
+    "译序",
+    "代跋",
+    "年谱",
+    "音乐列表",
+)
 
 
 @dataclass(frozen=True)
@@ -201,7 +211,40 @@ def is_auxiliary_document(item, document: EpubDocumentText) -> bool:  # noqa: AN
     title = document.title.strip().lower()
     if any(part in name for part in AUXILIARY_NAME_PARTS) and len(document.text) < 2000:
         return True
-    return title in AUXILIARY_TITLES and len(document.text) < 2000
+    if title in AUXILIARY_TITLES and len(document.text) < 2000:
+        return True
+    return is_non_story_document(document)
+
+
+def is_non_story_document(document: EpubDocumentText) -> bool:
+    text = document.text.strip()
+    first_line = first_meaningful_line(text)
+    label_source = f"{document.title}\n{first_line}"
+    if any(part in label_source for part in NON_STORY_TITLE_PARTS):
+        return True
+    if len(text) < 2500 and "书名：" in text and "作者：" in text:
+        return True
+    if len(text) < 2000 and "出版社" in text and ("digital lab" in text.lower() or "版权" in text):
+        return True
+    return is_chronology_document(first_line, text)
+
+
+def first_meaningful_line(text: str) -> str:
+    for line in text.splitlines():
+        cleaned = line.strip()
+        if cleaned:
+            return cleaned
+    return ""
+
+
+def is_chronology_document(first_line: str, text: str) -> bool:
+    if not first_line:
+        return False
+    if "年谱" in first_line:
+        return True
+    if re.match(r"^\d{4}年\s+\d+岁$", first_line):
+        return any(keyword in text for keyword in ("出版", "获", "入", "移居", "旅行", "大学"))
+    return False
 
 
 def clean_inline_text(text: str) -> str:

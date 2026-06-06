@@ -162,6 +162,18 @@
 *Update this file after every 2 view/browser/search operations*
 *This prevents visual information from being lost*
 
+## 2026-06-06 PR10.1 Incremental Compare Findings
+
+### First-principles framing
+- 长文等待体验的核心不是更频繁刷新，而是让已经完成的转换价值尽早可用。
+- 用户进入对照页后的首要任务是阅读和编辑，后台新增内容只能补充，不能覆盖正在编辑的文本、跳转当前场景或打乱滚动位置。
+- 最小可行边界是：后端保存 partial script，进度页提供入口，对照页顶部显示进度并轮询新增结果。
+
+### Scope decisions
+- PR10.1 should remain an extension of PR10 progress behavior, not the full PR11 compare-page redesign.
+- The compare page can auto-apply new result data only when the editor has no local dirty changes. If the user has edited YAML, the page should show a quiet “有新内容” action instead of replacing `yamlText`.
+- Do not introduce a merge editor or save API yet. That belongs to a later editing persistence pass if needed.
+
 ## 2026-06-05 Build Findings
 
 ### Product path
@@ -261,3 +273,25 @@
 - A pasted inline sample like `时间：、地点：、林照：对白` exposed that the placeholder scene builder still treated the first colon label as a speaker when the character table was empty.
 - A quoted attribution sample like `“别出声。”沈岚低声说。` proved character extraction worked, but placeholder output stayed as action, which made no-key demo behavior look weaker than the grounding layer.
 - Resolution: detect inline speaker labels after metadata labels, reject metadata labels as speakers even without a character table, split multi-label placeholder paragraphs when a real speaker label appears, and convert Chinese attributed quotes into dialogue beats.
+
+## 2026-06-06 PR10 Progress Page Findings
+
+### First-principles framing
+- 进度页的核心不是展示百分比，而是在等待期间降低不确定性：任务是否已接收、是否还在推进、当前处理到哪一章、失败后下一步是什么。
+- 小说转换天然按章节推进，所以章节标题和摘录比内部轮询细节更有解释力。百分比只作为辅助反馈。
+- 如果提交接口等待转换完成才返回任务号，进度页无法完成职责；必须先返回任务号，再让页面轮询状态。
+
+### Current implementation findings
+- `ConvertView.post` 当前创建任务后同步调用 `run_conversion_task(task)`，因此用户点击“开始转换”会停在上传页，直到转换结束才进入 `/progress/:taskId`。
+- `run_conversion_task` 已在处理中持续写入 `progress`、`chapters_done` 和 `total_chapters`，但同步提交路径让这些中间状态基本不可见。
+- 后端模型已有 `chapters` JSON 字段和 `chapter_to_payload` 摘录生成逻辑；把章节 payload 在拆分后尽早保存即可支撑进度页逐章预览，不需要新增表或改结果接口。
+- 状态接口目前只返回进度数字和处理方式，缺少 `input_name`、`source_format` 和 `chapters`。PR10 可以扩展状态接口，保持结果接口兼容。
+
+### Scope decisions
+- 使用轻量后台线程启动现有转换流程，适合当前 demo 和 Render 免费层；不在 PR10 引入 Celery、Redis 或任务队列运维成本。
+- 后台线程中的异常继续使用现有 `format_conversion_error` 写入 `failed + error_message`，避免把原始厂商错误暴露给普通作者。
+- 进度页文案继续避免 `API/provider/YAML/Schema` 等技术词，保留“处理服务、处理方式、剧本初稿、对照编辑”等普通中文。
+
+### Hand-test feedback
+- 用户上传《且听风吟》EPUB 后，进度页显示 99 个处理单元。后端任务 `5f25b8c2-36c9-4fe7-964a-36ae2c516521` 的保存数据表明并非前端编号错误，而是 EPUB 解析把版权信息、版权申明、数字出版说明、译序分块、村上春树年谱和音乐列表都放进了章节列表。
+- 修复方向：在 EPUB 解析层过滤明显非正文页面，而不是在进度页隐藏数字。进度页文案同时从“逐章预览”收窄为“逐段预览/素材”，因为长章节分块是处理单元，不一定等于原书章号。

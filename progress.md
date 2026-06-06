@@ -404,3 +404,64 @@
 - Next:
   - Start PR10 from `master`.
   - Scope PR10 to progress page waiting/feedback/preview behavior only.
+
+## Session: 2026-06-06 Phase 5 PR10 Execution
+
+### PR10: progress page
+- **Status:** complete
+- Actions taken:
+  - Read `planning-with-files` instructions and restored `task_plan.md`, `findings.md`, `progress.md`.
+  - Confirmed local `master` was synced to `origin/master` after PR9.
+  - Created working branch `codex-phase-5-pr10-progress-page` after nested `codex/...` branch creation failed in this Windows workspace and the flat branch needed elevated `.git/refs` permission.
+  - Inspected progress page, upload page, shared styles, polling composable, API client, status/result serializers, views, task model, pipeline, and tests.
+  - Recorded PR10 first-principles scope in `task_plan.md` and `findings.md`.
+  - Found that `POST /api/convert` synchronously ran conversion before returning `task_id`, which made intermediate progress states invisible to users.
+  - Added a lightweight backend task runner so the submit endpoint returns immediately and conversion continues in a background thread in the same process.
+  - Kept failure handling through the existing sanitized conversion error formatter.
+  - Saved chapter title/excerpt payloads as soon as chapter splitting finishes, so the progress page can show previews during processing.
+  - Extended the status response with task name, source type, and chapter previews while excluding full chapter text from polling responses.
+  - Rebuilt the progress page with stage copy, progress facts, next-step guidance, and a chapter preview list aligned with PR9 styles.
+  - Changed polling failure copy to actionable Chinese instead of raw network/library messages.
+- Current scope:
+  - Do not introduce Celery/Redis or deployment queue infrastructure in PR10.
+  - Do not change LLM provider selection, retry/manual-review rules, Act assembly, or compare-page YAML editing.
+- Validation so far:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 33 tests.
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+  - Django client smoke test with temporary `LLM_PROVIDER=placeholder`: passed. `POST /api/convert` returned immediately, status reached `completed`, status chapter payload excluded full chapter text, and result returned script content.
+
+### PR10 hand-test feedback: EPUB non-story documents
+- **Status:** complete
+- User uploaded `且听风吟.epub` and observed 99 progress units for a book expected to have fewer story sections.
+- Findings:
+  - Saved task `5f25b8c2-36c9-4fe7-964a-36ae2c516521` had 99 chapter payloads.
+  - The first payloads were `版权信息`, `版权申明`, a digital publishing note, and a translator preface split into two chunks.
+  - The tail payloads were author chronology entries and `《且听风吟》音乐列表`.
+  - This was backend EPUB filtering, not a frontend numbering bug.
+- Actions taken:
+  - Added EPUB non-story filtering for copyright pages, publishing notes, translator preface/afterword, author chronology, and music-list pages.
+  - Added a regression test that reproduces those EPUB front/back matter pages and keeps only story sections.
+  - Changed progress page labels from strict chapter wording to material/processing-segment wording so long-chapter chunks are not misrepresented as original book chapters.
+- Validation:
+  - `python manage.py test converter.tests.EpubParserTests`: passed, 2 tests.
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 33 tests.
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+### PR10.1 follow-up request recorded
+- **Status:** planned
+- User requested a long-article workflow improvement:
+  - Add a “查看已处理” entry next to refresh on the progress page.
+  - Allow users to open the compare page while conversion is still running.
+  - Show a progress bar at the top of the compare page.
+  - Incrementally update later processed chapters with minimal disruption to compare-page reading/editing.
+- Decision:
+  - Keep the current PR focused on PR10 progress page and EPUB count fix.
+  - Add this as Phase 5 `PR10.1` so it can include the necessary backend partial-result persistence and compare-page polling behavior without bloating PR10.

@@ -22,12 +22,13 @@ def run_conversion_task(task: ConversionTask) -> None:
     task.save(update_fields=["status", "progress", "updated_at"])
 
     chapters = split_chapters(task.source_text)
+    chapter_payloads = [chapter_to_payload(chapter) for chapter in chapters]
     task.total_chapters = len(chapters)
+    task.chapters = chapter_payloads
     task.progress = 25
-    task.save(update_fields=["total_chapters", "progress", "updated_at"])
+    task.save(update_fields=["total_chapters", "chapters", "progress", "updated_at"])
 
     characters = extract_character_table(task.source_text)
-    chapter_payloads = [chapter_to_payload(chapter) for chapter in chapters]
     scene_converter = build_scene_converter()
     scenes = []
     manual_review_labels = []

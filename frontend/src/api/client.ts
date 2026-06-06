@@ -8,10 +8,17 @@ export interface ConvertResponse {
 
 export interface StatusResponse {
   id: string;
+  input_name: string;
+  source_format: "text" | "epub";
   status: ConversionStatus;
   progress: number;
   chapters_done: number;
   total_chapters: number;
+  chapters: Array<{
+    index: number;
+    title: string;
+    excerpt: string;
+  }>;
   error_message: string;
   llm_provider: string;
 }
