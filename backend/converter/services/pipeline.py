@@ -8,6 +8,10 @@ from converter.services.llm_scene_converter import (
     OpenAICompatibleSceneConverter,
     SceneConverter,
 )
+from converter.services.conversion_recovery import (
+    build_manual_review_message,
+    convert_chapter_with_retry,
+)
 from converter.services.script_assembler import assemble_script
 from schema.script_schema import build_scene, dump_script_yaml, validate_script
 
@@ -26,9 +30,13 @@ def run_conversion_task(task: ConversionTask) -> None:
     chapter_payloads = [chapter_to_payload(chapter) for chapter in chapters]
     scene_converter = build_scene_converter()
     scenes = []
+    manual_review_labels = []
 
     for chapter in chapters:
-        scenes.append(scene_converter.convert_chapter(chapter, characters))
+        conversion = convert_chapter_with_retry(scene_converter, chapter, characters)
+        scenes.append(conversion.scene)
+        if conversion.manual_review_label:
+            manual_review_labels.append(conversion.manual_review_label)
         task.chapters_done = len(scenes)
         task.progress = conversion_progress(len(scenes), len(chapters))
         task.save(update_fields=["chapters_done", "progress", "updated_at"])
@@ -43,6 +51,7 @@ def run_conversion_task(task: ConversionTask) -> None:
     task.characters = characters
     task.chapters = chapter_payloads
     task.script_yaml = dump_script_yaml(script)
+    task.error_message = build_manual_review_message(manual_review_labels)
     task.chapters_done = len(chapters)
     task.progress = 100
     task.status = ConversionTask.Status.COMPLETED
@@ -51,6 +60,7 @@ def run_conversion_task(task: ConversionTask) -> None:
             "characters",
             "chapters",
             "script_yaml",
+            "error_message",
             "chapters_done",
             "progress",
             "status",

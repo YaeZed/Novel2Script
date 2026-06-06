@@ -313,3 +313,45 @@
 - Errors:
   - `rg` execution is denied in this sandbox; switched to PowerShell file search.
   - A broad `Select-String` over `backend` searched `db.sqlite3` and produced binary noise; future searches should filter source extensions.
+
+## Session: 2026-06-06 Phase 4 PR8 Execution
+
+### PR8: retry + manual-review fallback
+- **Status:** complete
+- Actions taken:
+  - Read `planning-with-files` instructions and restored `task_plan.md`, `findings.md`, `progress.md`.
+  - Ran session catchup; unsynced context only repeated old project-initialization messages and does not change PR8 scope.
+  - Confirmed local `HEAD` and `origin/master` are both `e791b65`.
+  - Created branch `codex/phase-4-pr8-retry-fallback`.
+  - Inspected pipeline, LLM scene converter, task model, serializers, view error handling, backend tests, frontend status polling, and progress page.
+  - Recorded PR8 scope: chapter-level retry, manual-review placeholder scene after retry exhaustion, hard failure for config/auth errors.
+  - Added `conversion_recovery.py` for retry orchestration, non-recoverable error detection, manual-review scene generation, and progress warning text.
+  - Wired `run_conversion_task` through chapter-level retry and persisted warning text on completed tasks when fallback scenes exist.
+  - Added `LLM_SCENE_MAX_ATTEMPTS` setting and documented it in `.env.example`, README, CODEX, and schema docs.
+  - Updated the progress page to show completed-with-warning as “已完成，部分章节待处理”.
+  - Added regression tests for retry success, retry exhaustion fallback, and provider auth errors not being retried.
+- Current scope:
+  - Do not change PR7 Act assembly.
+  - Do not add new task statuses unless existing completed/failed semantics cannot express the UX.
+- Errors:
+  - `git rev-parse --short master origin/master HEAD` failed because this Git invocation needed a single revision with `--short`; reran separate revision checks.
+  - First branch creation failed because the sandbox could not create nested `.git/refs/heads/codex/...`; reran with approved escalation.
+  - Self-review found a misleading manual-scene sentence claiming the failure reason was summarized on the progress page; removed it and reran validation.
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 30 tests.
+  - `npm.cmd run build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+### PR8 hand-test and neat-freak sync
+- **Status:** complete
+- User hand-tested PR8 fallback flow in the browser and reported no issues.
+- Ran `neat-freak` knowledge cleanup:
+  - Checked root file inventory, docs inventory, markdown file list, and line counts.
+  - Updated `CODEX.md` from PR7/PR8-in-progress wording to PR8-ready-for-PR wording.
+  - Updated `agents.md` current conversion flow so retry/manual-review fallback is current behavior, not a future target.
+  - Updated `docs/schema.md` to remove the stale “failure fallback later” note.
+  - Updated `task_plan.md` current phase to Phase 5 after PR8 completion.
+- Validation:
+  - Root docs remain under size limits: `CODEX.md` 145 lines, `agents.md` 122 lines, `docs/schema.md` 68 lines.

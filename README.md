@@ -50,6 +50,7 @@ npm run dev
 ```text
 LLM_PROVIDER=placeholder
 LLM_MAX_TOKENS=3000
+LLM_SCENE_MAX_ATTEMPTS=2
 
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-4-20250514
@@ -66,6 +67,8 @@ QWEN_JSON_MODE=false
 ```
 
 `LLM_PROVIDER` 支持 `placeholder`、`anthropic`、`openai`、`qwen`、`auto`。默认 `placeholder` 只跑本地占位转换，不调用外部模型。显式指定 `anthropic` / `openai` / `qwen` 但缺少对应 key 时，任务会失败并返回配置错误。`auto` 会按 Anthropic → OpenAI → 千问的顺序选择第一个已配置 key，只建议明确知道当前环境变量状态时使用。
+
+真实模型单章转换默认最多尝试 `LLM_SCENE_MAX_ATTEMPTS=2` 次。重试后仍拿不到合法 Scene 时，该章节会生成“需人工处理”的占位场，任务仍可进入对照页；认证、key 缺失或 provider 配置错误不会走占位兜底，会直接失败并提示修正配置。
 
 本地开发且 `DEBUG=true` 时，`backend/.env` 会覆盖系统环境变量；把某个 key 留空就表示禁用该 key。部署或 `DEBUG=false` 时，平台环境变量优先。修改 `.env` 后需要重启 Django 后端。
 

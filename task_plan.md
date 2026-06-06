@@ -4,7 +4,7 @@
 构建一个 AI 辅助剧本创作工具，用户上传 3 章以上小说文本（txt/epub/粘贴），自动转换为结构化剧本（YAML 格式），并提供原文 vs 剧本并排对照视图，3 天内完成并部署上线。
 
 ## Current Phase
-Phase 4
+Phase 5
 
 ## PR 策略
 
@@ -55,8 +55,8 @@ Phase 4
 - [x] PR5: 章节拆分 + EPUB 解析
 - [x] PR6: 角色提取 + prompt grounding
 - [x] PR7: 多章拼装 + Act 合并
-- [ ] PR8: 错误兜底（retry + 人工标记）
-- **Status:** pending
+- [x] PR8: 错误兜底（retry + 人工标记）
+- **Status:** complete
 
 ### Phase 5: 前端全部页面
 - [ ] PR9: 上传页
@@ -127,6 +127,40 @@ Phase 4
   - `python -m compileall backend`: passed.
   - `python manage.py check`: passed.
   - `python manage.py test`: passed, 27 tests.
+  - `npm.cmd run build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+## 2026-06-06 PR8 Execution Plan
+
+- Problem: the current pipeline treats one bad LLM chapter response as a full task failure, so the author cannot open the compare view or salvage already converted chapters.
+- User impact: long conversions should keep usable work. If a single chapter cannot be parsed after retry, the author should still receive a YAML draft with a clear manual-processing marker at the affected chapter.
+- Scope:
+  - Add chapter-level retry around model scene conversion.
+  - Keep provider configuration and authentication errors as hard failures with the existing sanitized message.
+  - After retry exhaustion, create a schema-valid manual-review scene for that chapter.
+  - Surface a concise warning through `error_message` while keeping task status `completed` when fallback scenes exist.
+  - Document the retry/manual-review rule.
+  - Keep Act grouping and character extraction unchanged.
+- First-principles framing:
+  - The product problem is not "make every model response perfect"; it is "avoid trapping the author outside the editor."
+  - The direct path is to isolate failure at the smallest useful unit: a chapter scene.
+  - From zero, the conversion contract should be `chapter -> scene or explicit manual-review placeholder`; the full script should still assemble if each chapter has a scene-shaped result.
+- Validation target:
+  - Backend tests for retry success, retry exhaustion fallback, and hard provider config/auth failure.
+  - `python -m compileall backend`, `python manage.py check`, `python manage.py test`, frontend build, and `git diff --check`.
+
+## 2026-06-06 PR8 Completion
+
+- Delivered:
+  - Added chapter-level retry around scene conversion with `LLM_SCENE_MAX_ATTEMPTS`.
+  - Kept auth/config/provider errors as hard failures so users get actionable setup guidance instead of misleading placeholders.
+  - Added schema-valid manual-review scenes after retry exhaustion, preserving `source_chapter` for compare-page original text lookup.
+  - Completed tasks with manual-review scenes now carry a warning in `error_message`, and the progress page shows “已完成，部分章节待处理”.
+  - Documented retry/manual-review behavior in README, CODEX, `.env.example`, and schema docs.
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 30 tests.
   - `npm.cmd run build`: passed.
   - `git diff --check`: passed; only CRLF normalization warnings.
 

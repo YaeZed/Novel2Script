@@ -2,10 +2,10 @@
 
 ## Current Rule
 
-- 当前分支：`master`。
-- Phase 4 已完成 PR5-PR7：章节/EPUB 处理、角色提取、prompt grounding、多章拼装和 Act 划分都已合并。
-- 下一步从最新 `master` 新开 PR8 分支，只处理 LLM 解析失败后的 retry 和人工处理标记。
-- 不要在 PR8 里重做 Act 划分策略，除非发现 PR7 的真实回归。
+- 当前分支：`codex/phase-4-pr8-retry-fallback`。
+- Phase 4 已完成 PR5-PR8：章节/EPUB 处理、角色提取、prompt grounding、多章拼装、Act 划分、章节级 retry 和人工处理标记都已实现。
+- 下一步合并 PR8 后进入 Phase 5，重点检查和打磨前端上传页、进度页、对照页体验。
+- 不要在 Phase 5 里重写后端转换策略，除非手测发现真实回归。
 
 ## 项目定位
 
@@ -13,16 +13,17 @@ AI 小说转剧本工具。用户输入 3 章以上小说文本或 EPUB，系统
 
 ## 当前阶段
 
-Phase 4 PR7 已合并到 `master`。当前主分支具备可运行的端到端 demo：
+Phase 4 PR8 分支具备可运行的端到端 demo：
 
 - 默认 `LLM_PROVIDER=placeholder`，无 API key 也能完成本地占位转换。
 - 显式配置 `anthropic` / `openai` / `qwen` 后，后端会调用对应模型把单章小说转换为 Scene/Beat。
 - 后端会先拆分章节/EPUB、提取来源证据角色表，再逐章转换。
 - 多章结果会按全剧顺序重新编号 Scene，并按开端、展开、收束组装为 Act。
+- 真实模型单章失败会先按 `LLM_SCENE_MAX_ATTEMPTS` 重试；重试后仍失败时生成“需人工处理”的 Scene，任务仍可进入对照页。
 - 进度页会显示当前模型模式；provider 配置错误会显示脱敏后的中文提示。
 - 对照页 YAML 编辑已支持“草稿无效但保留最后一次有效结构”的校验体验。
 
-当前进入 Phase 4 PR8：补齐 retry 和人工处理标记。
+当前准备提交 Phase 4 PR8。
 
 ## 目录约定
 
@@ -93,6 +94,7 @@ DJANGO_SECRET_KEY=change-me
 DEBUG=true
 LLM_PROVIDER=placeholder
 LLM_MAX_TOKENS=3000
+LLM_SCENE_MAX_ATTEMPTS=2
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-4-20250514
 OPENAI_API_KEY=
@@ -106,6 +108,8 @@ QWEN_JSON_MODE=false
 ```
 
 本地开发且 `DEBUG=true` 时以 `backend/.env` 为准，`.env` 会覆盖系统环境变量；部署或 `DEBUG=false` 时平台环境变量优先。修改 `.env` 后必须重启 Django 后端，否则运行中的进程仍使用旧配置。
+
+真实 provider 单章转换默认最多尝试 `LLM_SCENE_MAX_ATTEMPTS=2` 次。模型输出仍无法解析时生成“需人工处理”的 Scene，让作者继续进入对照页；认证、key 缺失和 provider 配置错误属于管理员动作，不做人工占位兜底。
 
 前端读取 `frontend/.env`：
 
