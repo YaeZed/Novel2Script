@@ -371,6 +371,23 @@
 - `docs/schema.md` should describe the stable YAML contract and generation behavior, not accumulate PR-by-PR notes.
 - `README.md` must include dependency and original-feature lists because project rules require it for handoff and evaluation.
 
+## 2026-06-07 PR14 Deployment Findings
+
+### First-principles framing
+- 要解决的问题不是“补几个部署文件”，而是让 demo 可以离开本机复现：浏览器访问公开页面，页面调用公开处理服务，处理服务保存任务并按环境变量选择是否调用真实模型。
+- 最直接路径是环境驱动配置。Local defaults keep SQLite/localhost/placeholder; deployment injects `DATABASE_URL`, public hostnames, CORS origins, and server-side model keys.
+- 从零设计的部署边界是 `Vercel static SPA -> Render Django API -> Render PostgreSQL -> optional LLM provider`。密钥、额度和模型选择只属于后端部署边界。
+
+### Deployment decisions
+- Add Render Blueprint at repo root. It creates a Django web service plus PostgreSQL and uses `DATABASE_URL` from the database resource.
+- Use `bash ./build.sh` instead of `./build.sh` so Windows-created executable bits do not break Render builds.
+- Add WhiteNoise and Gunicorn for production Django static serving and WSGI startup.
+- Add `dj-database-url` and `psycopg2-binary` so the same settings module can use local SQLite or Render PostgreSQL.
+- Add `/healthz` as a platform health check that avoids touching conversion state.
+- Exempt `/healthz` from HTTPS redirects so platform health checks get a direct 200 response even when `SECURE_SSL_REDIRECT=true`.
+- Add Vercel rewrite to `index.html` so `/progress/:taskId` and `/compare/:taskId` survive refreshes.
+- Keep `LLM_PROVIDER=placeholder` as the deploy default to avoid accidentally sending reviewer material to external model providers.
+
 ## 2026-06-06 PR10 Progress Page Findings
 
 ### First-principles framing

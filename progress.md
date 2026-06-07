@@ -674,6 +674,32 @@
   - `node node_modules\vite\bin\vite.js build`: passed.
   - `git diff --check`: passed; only CRLF normalization warnings.
 
+### PR14 deployment + README
+- **Status:** complete
+- Started branch `codex-phase-6-pr14-deploy-readme` because local remote refs prevented creating a slash-prefixed `codex/...` branch.
+- Added deployment plan to `task_plan.md`.
+- Added Render backend deployment files:
+  - `render.yaml` for Django web service + PostgreSQL.
+  - `backend/build.sh` for dependency install, static collection, and migrations.
+- Added production Django configuration:
+  - env-driven `DJANGO_ALLOWED_HOSTS`, CORS origins, CSRF trusted origins.
+  - optional `DATABASE_URL` via `dj-database-url`.
+  - WhiteNoise static files and `/healthz` endpoint.
+- Added `frontend/vercel.json` rewrite for SPA deep links.
+- Added backend deployment dependencies: `dj-database-url`, `psycopg2-binary`, `gunicorn`, `whitenoise[brotli]`.
+- Rewrote `README.md` as local + deployment runbook.
+- Synced `CODEX.md`, `agents.md`, and `findings.md` with deployment boundaries.
+- Added `/healthz` test coverage.
+- Validation:
+  - `python -m pip install -r requirements.txt`: passed.
+  - `python -m compileall .`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 48 tests.
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+  - Production-style `python manage.py check --deploy`: passed with expected HSTS includeSubdomains/preload warnings intentionally left off for shared domains.
+
 ### PR12 hand-test feedback: Chinese YAML and highlight alignment
 - **Status:** fixed
 - User asked for YAML field names to be Chinese without affecting backend processing, and reported highlight background drift after typography changes.

@@ -448,6 +448,19 @@ class OpenAICompatibleSceneConverterTests(TestCase):
 
 
 class ConversionApiTests(TestCase):
+    def test_health_check_endpoint_returns_ok(self) -> None:
+        response = self.client.get("/healthz")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+
+    @override_settings(SECURE_SSL_REDIRECT=True)
+    def test_health_check_skips_https_redirect(self) -> None:
+        response = self.client.get("/healthz")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+
     @override_settings(
         LLM_PROVIDER="auto",
         ANTHROPIC_API_KEY="",
