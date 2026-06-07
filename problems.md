@@ -1,5 +1,51 @@
 # Problems Log
 
+## 2026-06-07: 长文处理期间无法提前查看已完成内容
+
+### 现象
+- 长文或 EPUB 转换耗时较长时，用户只能停留在进度页等待全部完成。
+- 即使前面的章节已经处理完，页面也没有入口查看已生成草稿，用户无法提前开始对照检查。
+- 用户进入对照视图后，也缺少“任务还在继续”的进度反馈。
+
+### 根因
+- 后端原本只在整本转换完成后保存最终剧本文件；处理中间态只有章节进度数字，没有可被结果接口读取的部分草稿。
+- 进度页只区分等待、失败、完成，缺少“已有可查看内容”的状态。
+- 对照页原本按一次性结果设计，没有轮询后续更新，也没有处理“用户正在编辑时服务端有新内容”的覆盖风险。
+
+### 用户影响
+- 长文章处理期间，已经生成的价值被锁在等待流程里，用户只能被动等待。
+- 用户不能边生成边检查，整体交付感变差。
+- 如果直接自动覆盖编辑区，会打断用户正在进行的对照和修改，因此增量更新必须避免破坏当前编辑上下文。
+
+### 处理决策
+- 后端每完成一个章节后保存一次 schema-valid 的部分剧本草稿。
+- 状态接口增加 `can_view_result`，只有存在可查看草稿时才展示入口。
+- 进度页在“刷新”右侧增加“查看已处理”按钮，让用户提前进入对照视图。
+- 对照页顶部显示处理进度，并轮询状态与结果：
+  - 用户没有编辑当前草稿时，自动载入新生成内容。
+  - 用户已经编辑当前草稿时，只提示“载入新内容”，不自动覆盖。
+- 样式复用已有 `AppButton`、`SectionHeader`、`StatusPill`、面板和进度条，避免新增一套视觉语言。
+
+### 修复与验证
+- 修复位置：
+  - `backend/converter/services/pipeline.py`
+  - `backend/converter/serializers.py`
+  - `frontend/src/pages/ProgressPage.vue`
+  - `frontend/src/pages/ComparePage.vue`
+  - `frontend/src/styles.css`
+- 回归测试：
+  - 状态接口在无草稿时返回 `can_view_result: false`。
+  - 处理完第一章后，任务仍在 processing 状态但已经持久化部分剧本。
+  - 对照页在用户有本地编辑时不会自动覆盖编辑区。
+- 已验证：
+  - `python -m compileall backend`
+  - `python manage.py check`
+  - `python manage.py test`
+  - `python manage.py test converter.tests.ConversionApiTests converter.tests.ConversionPipelineTests`
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`
+  - `node node_modules\vite\bin\vite.js build`
+  - `git diff --check`
+
 ## 2026-06-06: EPUB 进度页素材数量多于用户预期章节数
 
 ### 现象
