@@ -588,6 +588,25 @@
   - `node node_modules\vite\bin\vite.js build`: passed.
   - `git diff --check`: passed; only CRLF normalization warnings.
 
+## Session: 2026-06-07 Phase 6 PR13 Execution
+
+### PR13: schema documentation
+- **Status:** complete
+- Actions taken:
+  - Fast-forwarded local `master` to PR12 merge commit `3462ca9`.
+  - Created branch `codex/phase-6-pr13-schema-docs`.
+  - Restored `task_plan.md`, `findings.md`, and `progress.md` with the planning-with-files workflow.
+  - Recorded PR13 scope: authoritative schema documentation, backend/export contract, compare-page Chinese display mapping, and review metadata boundary.
+  - Rewrote `docs/schema.md` around the current backend schema, frontend zod schema, Chinese editor mapping, partial drafts, manual-review scenes, and local review metadata boundary.
+  - Minimally updated `CODEX.md` current-state notes to reflect PR12 reading controls, scene marks, YAML color marks, and PR13 status.
+- Current scope:
+  - Update documentation only unless code and docs disagree.
+  - Keep backend schema, frontend validation, conversion flow, and compare-page behavior unchanged.
+- Validation:
+  - Source-backed documentation review against backend schema, frontend zod schema, compare-page localization, script assembly, and recovery code.
+  - Chinese display mapping check: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
 ### PR12 hand-test feedback: YAML color marking menu
 - **Status:** fixed
 - User reported:

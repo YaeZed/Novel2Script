@@ -52,6 +52,18 @@
 ## Visual/Browser Findings
 -
 
+## 2026-06-07 PR13 Schema Documentation Findings
+
+### First-principles framing
+- The schema doc is a contract document, not a feature changelog. It should answer what the downloadable script file contains, what the editor may display differently, and what validation guarantees.
+- The stable boundary is backend/exported YAML with English keys. PR12's Chinese editor labels are a display-layer mapping so authors can edit in Chinese without changing storage, API, or validation contracts.
+- Review marks and color highlights are local workspace metadata. They help the author review, but they must not appear in exported YAML or backend result data.
+
+### Scope decisions
+- PR13 should update documentation only unless implementation and docs disagree in a way that would confuse validation.
+- `docs/schema.md` should be the authoritative schema guide. README can stay higher level unless it has stale schema claims.
+- The doc should use ordinary Chinese explanations for product-facing concepts, but may name raw YAML keys because this is a developer/schema reference.
+
 ## 2026-06-07 PR12 Reading Experience Findings
 
 ### First-principles framing
