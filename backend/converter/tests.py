@@ -6,6 +6,11 @@ from django.test import TestCase, override_settings
 from ebooklib import ITEM_DOCUMENT
 
 from converter.models import ConversionTask
+from converter.services.act_boundary_planner import (
+    build_act_boundary_planner,
+    build_act_boundary_prompt,
+    normalize_act_boundary_payload,
+)
 from converter.services.character_extractor import extract_character_table
 from converter.services.chapter_splitter import Chapter, split_chapters
 from converter.services.epub_parser import extract_epub_text
@@ -16,7 +21,7 @@ from converter.services.llm_scene_converter import (
     build_chapter_prompt,
 )
 from converter.services.pipeline import PlaceholderSceneConverter, build_scene_converter, run_conversion_task
-from converter.services.script_assembler import assemble_script
+from converter.services.script_assembler import ActBoundary, assemble_partial_script, assemble_script
 
 
 SAMPLE_TEXT = (
@@ -101,6 +106,20 @@ class CharacterExtractorTests(TestCase):
         names = [character["name"] for character in extract_character_table(text)]
 
         self.assertEqual(names, ["\u6797\u7167"])
+
+    def test_filters_object_labels_and_embedded_action_phrases(self) -> None:
+        text = (
+            "\u6797\u7167\uff1a\u706f\u5854\u4e0d\u8be5\u505c\u3002\n"
+            "\u5979\u5728\u706f\u5854\u95e8\u53e3\u6361\u5230\u4e00\u5f20\u65e7\u8239\u7968\uff0c"
+            "\u80cc\u9762\u5199\u7740\uff1a\u522b\u76f8\u4fe1\u6f6e\u6c50\u8868\u3002\n"
+            "\u6797\u7167\u542f\u52a8\u5907\u7528\u706f\uff0c\u6d77\u9762\u4e0a\u7684\u641c\u6551\u8239\u7ec8\u4e8e\u770b\u89c1\u706f\u5149\u3002\n"
+        )
+
+        names = [character["name"] for character in extract_character_table(text)]
+
+        self.assertEqual(names, ["\u6797\u7167"])
+        self.assertNotIn("\u80cc\u9762\u5199\u7740", names)
+        self.assertNotIn("\u6551\u8239\u7ec8\u4e8e", names)
 
 
 class FakeEpubItem:
@@ -275,6 +294,7 @@ class ClaudeSceneConverterTests(TestCase):
 
         self.assertIn("Grounding rules:", prompt)
         self.assertIn("Use only the provided chapter text", prompt)
+        self.assertIn("\u80cc\u9762\u5199\u7740", prompt)
         self.assertIn("Known characters JSON", prompt)
         self.assertIn("\u6797\u7167", prompt)
         self.assertIn("<chapter_text>", prompt)
@@ -309,6 +329,56 @@ class ClaudeSceneConverterTests(TestCase):
         call = client.messages.calls[0]
         self.assertEqual(call["model"], "claude-test")
         self.assertIn("\u7b2c\u4e00\u7ae0 \u96e8\u591c", call["messages"][0]["content"])
+
+    def test_reorders_beats_to_match_source_chronology(self) -> None:
+        chapter_text = (
+            "\u7b2c\u4e09\u7ae0 \u6f6e\u6c50\u8868\n"
+            "\u6797\u7167\u548c\u6c88\u5c9a\u53bb\u6863\u6848\u9986\uff0c"
+            "\u53d1\u73b0\u8fc7\u53bb\u4e09\u4e2a\u6708\u7684\u6f6e\u6c50\u8868\u90fd\u88ab\u4eba\u6539\u8fc7\u3002\n"
+            "\u65e7\u7ba1\u7406\u5458\u544a\u8bc9\u5979\u4eec\uff0c"
+            "\u5341\u5e74\u524d\u6709\u4e00\u8258\u8d27\u8239\u5728\u706f\u5854\u5916\u6c89\u6ca1\uff0c"
+            "\u4f46\u4e8b\u6545\u62a5\u544a\u4ece\u672a\u516c\u5f00\u3002\n"
+            "\u6c88\u5c9a\uff1a\u6709\u4eba\u4e00\u76f4\u5728\u8ba9\u8239\u9760\u9519\u65b9\u5411\u3002\n"
+        )
+        client = FakeClaudeClient(
+            """
+            {
+              "title": "\u6f6e\u6c50\u8868",
+              "summary": "\u6863\u6848\u9986\u91cc\u7684\u8bb0\u5f55\u6307\u5411\u65e7\u6848\u3002",
+              "beats": [
+                {"type": "direction", "content": "\u7279\u5199\uff1a\u4e09\u4efd\u6f6e\u6c50\u8868\u5e76\u6392\u644a\u5f00\u3002"},
+                {"type": "dialogue", "character": "\u6c88\u5c9a", "content": "\u6709\u4eba\u4e00\u76f4\u5728\u8ba9\u8239\u9760\u9519\u65b9\u5411\u3002"},
+                {"type": "action", "content": "\u65e7\u7ba1\u7406\u5458\u501a\u5728\u95e8\u8fb9\uff0c\u8896\u53e3\u78e8\u5f97\u53d1\u4eae\u3002"},
+                {"type": "dialogue", "character": "\u65e7\u7ba1\u7406\u5458", "content": "\u5341\u5e74\u524d\uff0c\u4e00\u8258\u8d27\u8239\u5728\u706f\u5854\u5916\u6c89\u4e86\u3002\u4e8b\u6545\u62a5\u544a\u6ca1\u516c\u5f00\u8fc7\u3002"}
+              ]
+            }
+            """
+        )
+        converter = ClaudeSceneConverter(
+            api_key="test-key",
+            model="claude-test",
+            max_tokens=1000,
+            client=client,
+        )
+
+        scene = converter.convert_chapter(
+            Chapter(index=3, title="\u7b2c\u4e09\u7ae0 \u6f6e\u6c50\u8868", text=chapter_text),
+            [
+                {"name": "\u6c88\u5c9a", "role": "\u4e3b\u8981\u89d2\u8272"},
+                {"name": "\u65e7\u7ba1\u7406\u5458", "role": "\u914d\u89d2"},
+            ],
+        )
+
+        contents = [beat["content"] for beat in scene["beats"]]
+        self.assertEqual(
+            contents,
+            [
+                "\u7279\u5199\uff1a\u4e09\u4efd\u6f6e\u6c50\u8868\u5e76\u6392\u644a\u5f00\u3002",
+                "\u65e7\u7ba1\u7406\u5458\u501a\u5728\u95e8\u8fb9\uff0c\u8896\u53e3\u78e8\u5f97\u53d1\u4eae\u3002",
+                "\u5341\u5e74\u524d\uff0c\u4e00\u8258\u8d27\u8239\u5728\u706f\u5854\u5916\u6c89\u4e86\u3002\u4e8b\u6545\u62a5\u544a\u6ca1\u516c\u5f00\u8fc7\u3002",
+                "\u6709\u4eba\u4e00\u76f4\u5728\u8ba9\u8239\u9760\u9519\u65b9\u5411\u3002",
+            ],
+        )
 
     def test_invalid_claude_response_raises_clear_error(self) -> None:
         converter = ClaudeSceneConverter(
@@ -526,6 +596,96 @@ class ConversionPipelineTests(TestCase):
         self.assertEqual(script["acts"][0]["title"], "\u7b2c\u4e00\u5e55\uff1a\u5168\u7bc7")
         self.assertEqual([scene["number"] for scene in script["acts"][0]["scenes"]], [1, 2])
 
+    def test_assemble_script_uses_valid_act_boundaries(self) -> None:
+        scenes = [
+            scene_payload(number=99, source_chapter=1, title="\u96e8\u591c"),
+            scene_payload(number=99, source_chapter=2, title="\u540e\u53f0"),
+            scene_payload(number=99, source_chapter=3, title="\u51b7\u5149"),
+            scene_payload(number=99, source_chapter=4, title="\u8ffd\u95ee"),
+            scene_payload(number=99, source_chapter=5, title="\u771f\u76f8"),
+        ]
+        boundaries = [
+            ActBoundary(1, "\u7b2c\u4e00\u5e55\uff1a\u5f00\u7aef", 1, 2),
+            ActBoundary(2, "\u7b2c\u4e8c\u5e55\uff1a\u5c55\u5f00", 3, 4),
+            ActBoundary(3, "\u7b2c\u4e09\u5e55\uff1a\u6536\u675f", 5, 5),
+        ]
+
+        script = assemble_script(title="\u6837\u672c", characters=[], scenes=scenes, act_boundaries=boundaries)
+
+        self.assertEqual([len(act["scenes"]) for act in script["acts"]], [2, 2, 1])
+        self.assertEqual(
+            [scene["number"] for act in script["acts"] for scene in act["scenes"]],
+            [1, 2, 3, 4, 5],
+        )
+
+    def test_assemble_script_falls_back_for_invalid_act_boundaries(self) -> None:
+        scenes = [
+            scene_payload(number=99, source_chapter=1, title="\u96e8\u591c"),
+            scene_payload(number=99, source_chapter=2, title="\u540e\u53f0"),
+            scene_payload(number=99, source_chapter=3, title="\u51b7\u5149"),
+            scene_payload(number=99, source_chapter=4, title="\u8ffd\u95ee"),
+            scene_payload(number=99, source_chapter=5, title="\u771f\u76f8"),
+        ]
+        boundaries = [
+            ActBoundary(1, "\u7b2c\u4e00\u5e55\uff1a\u5f00\u7aef", 1, 1),
+            ActBoundary(2, "\u7b2c\u4e8c\u5e55\uff1a\u5c55\u5f00", 3, 4),
+            ActBoundary(3, "\u7b2c\u4e09\u5e55\uff1a\u6536\u675f", 5, 5),
+        ]
+
+        script = assemble_script(title="\u6837\u672c", characters=[], scenes=scenes, act_boundaries=boundaries)
+
+        self.assertEqual([len(act["scenes"]) for act in script["acts"]], [1, 3, 1])
+
+    def test_partial_script_uses_single_processed_section(self) -> None:
+        scenes = [
+            scene_payload(number=99, source_chapter=1, title="\u96e8\u591c"),
+            scene_payload(number=99, source_chapter=2, title="\u540e\u53f0"),
+            scene_payload(number=99, source_chapter=3, title="\u51b7\u5149"),
+            scene_payload(number=99, source_chapter=4, title="\u8ffd\u95ee"),
+            scene_payload(number=99, source_chapter=5, title="\u771f\u76f8"),
+        ]
+
+        script = assemble_partial_script(title="\u6837\u672c", characters=[], scenes=scenes)
+
+        self.assertEqual(len(script["acts"]), 1)
+        self.assertEqual(script["acts"][0]["title"], "\u5df2\u5904\u7406\u90e8\u5206")
+        self.assertEqual([scene["number"] for scene in script["acts"][0]["scenes"]], [1, 2, 3, 4, 5])
+
+    def test_normalize_act_boundary_payload_requires_full_scene_coverage(self) -> None:
+        payload = {
+            "acts": [
+                {"number": 1, "start_scene": 1, "end_scene": 1, "rationale": "\u5f00\u573a"},
+                {"number": 2, "start_scene": 3, "end_scene": 4, "rationale": "\u53d1\u5c55"},
+                {"number": 3, "start_scene": 5, "end_scene": 5, "rationale": "\u6536\u675f"},
+            ]
+        }
+
+        with self.assertRaisesMessage(Exception, "cover every scene"):
+            normalize_act_boundary_payload(payload, scene_count=5)
+
+    def test_act_boundary_prompt_includes_scene_events(self) -> None:
+        prompt = build_act_boundary_prompt(
+            [
+                {
+                    "number": 1,
+                    "source_chapter": 2,
+                    "title": "\u540e\u53f0",
+                    "summary": "\u6c88\u5c9a\u542c\u89c1\u5f02\u54cd\u3002",
+                    "beats": [
+                        {
+                            "type": "dialogue",
+                            "character": "\u6c88\u5c9a",
+                            "content": "\u4f60\u542c\u89c1\u4e86\u5417\uff1f",
+                        }
+                    ],
+                }
+            ]
+        )
+
+        self.assertIn('"source_chapter": 2', prompt)
+        self.assertIn("\u6c88\u5c9a", prompt)
+        self.assertIn("\u4f60\u542c\u89c1\u4e86\u5417", prompt)
+
     def test_placeholder_filters_metadata_dialogue_with_character_table(self) -> None:
         converter = PlaceholderSceneConverter()
         chapter = Chapter(
@@ -597,6 +757,10 @@ class ConversionPipelineTests(TestCase):
         converter = build_scene_converter()
 
         self.assertEqual(converter.__class__.__name__, "PlaceholderSceneConverter")
+
+    @override_settings(LLM_PROVIDER="placeholder")
+    def test_placeholder_provider_does_not_build_act_boundary_planner(self) -> None:
+        self.assertIsNone(build_act_boundary_planner("placeholder"))
 
     @override_settings(
         LLM_PROVIDER="qwen",
@@ -697,6 +861,7 @@ class ConversionPipelineTests(TestCase):
         self.assertEqual(observed["status"], ConversionTask.Status.PROCESSING)
         self.assertEqual(observed["chapters_done"], 1)
         self.assertGreater(observed["progress"], 25)
+        self.assertEqual([act["title"] for act in partial_script["acts"]], ["\u5df2\u5904\u7406\u90e8\u5206"])
         self.assertEqual([scene["title"] for scene in partial_scenes], ["\u96e8\u591c"])
 
         task.refresh_from_db()
@@ -813,7 +978,10 @@ class ConversionPipelineTests(TestCase):
         )
         task = ConversionTask.objects.create(input_name="three.txt", source_text=source_text)
 
-        with patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class:
+        with (
+            patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class,
+            patch("converter.services.pipeline.build_act_boundary_planner", return_value=None),
+        ):
             converter = converter_class.return_value
             converter.convert_chapter.side_effect = [
                 scene_payload(number=10, source_chapter=1, title="\u96e8\u591c"),
@@ -833,6 +1001,127 @@ class ConversionPipelineTests(TestCase):
         all_scenes = [scene for act in script["acts"] for scene in act["scenes"]]
         self.assertEqual([scene["number"] for scene in all_scenes], [1, 2, 3])
         self.assertEqual([scene["source_chapter"] for scene in all_scenes], [1, 2, 3])
+
+    @override_settings(
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="test-key",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+        ANTHROPIC_MODEL="claude-test",
+        LLM_MAX_TOKENS=1000,
+    )
+    def test_pipeline_uses_model_act_boundaries_for_final_script(self) -> None:
+        source_text = (
+            "\u7b2c\u4e00\u7ae0 \u96e8\u591c\n\u6797\u7167\uff1a\u5f00\u95e8\u3002\n\n"
+            "\u7b2c\u4e8c\u7ae0 \u540e\u53f0\n\u6c88\u5c9a\uff1a\u542c\u89c1\u4e86\u5417\uff1f\n\n"
+            "\u7b2c\u4e09\u7ae0 \u51b7\u5149\n\u706f\u5149\u4ece\u95e8\u7f1d\u91cc\u900f\u51fa\u3002\n\n"
+            "\u7b2c\u56db\u7ae0 \u771f\u76f8\n\u95e8\u6253\u5f00\u4e86\u3002\n"
+        )
+        task = ConversionTask.objects.create(input_name="four.txt", source_text=source_text)
+        planner = FakeActBoundaryPlanner(
+            [
+                ActBoundary(1, "\u7b2c\u4e00\u5e55\uff1a\u5f00\u7aef", 1, 2),
+                ActBoundary(2, "\u7b2c\u4e8c\u5e55\uff1a\u5c55\u5f00", 3, 3),
+                ActBoundary(3, "\u7b2c\u4e09\u5e55\uff1a\u6536\u675f", 4, 4),
+            ]
+        )
+
+        with (
+            patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class,
+            patch("converter.services.pipeline.build_act_boundary_planner", return_value=planner),
+        ):
+            converter = converter_class.return_value
+            converter.convert_chapter.side_effect = [
+                scene_payload(number=10, source_chapter=1, title="\u96e8\u591c"),
+                scene_payload(number=10, source_chapter=2, title="\u540e\u53f0"),
+                scene_payload(number=10, source_chapter=3, title="\u51b7\u5149"),
+                scene_payload(number=10, source_chapter=4, title="\u771f\u76f8"),
+            ]
+
+            run_conversion_task(task)
+
+        task.refresh_from_db()
+        script = yaml.safe_load(task.script_yaml)
+        self.assertEqual([len(act["scenes"]) for act in script["acts"]], [2, 1, 1])
+        self.assertEqual(planner.seen_scene_numbers, [1, 2, 3, 4])
+
+    @override_settings(
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="test-key",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+        ANTHROPIC_MODEL="claude-test",
+        LLM_MAX_TOKENS=1000,
+    )
+    def test_pipeline_falls_back_when_model_act_boundaries_are_invalid(self) -> None:
+        source_text = (
+            "\u7b2c\u4e00\u7ae0 \u96e8\u591c\n\u6797\u7167\uff1a\u5f00\u95e8\u3002\n\n"
+            "\u7b2c\u4e8c\u7ae0 \u540e\u53f0\n\u6c88\u5c9a\uff1a\u542c\u89c1\u4e86\u5417\uff1f\n\n"
+            "\u7b2c\u4e09\u7ae0 \u51b7\u5149\n\u706f\u5149\u4ece\u95e8\u7f1d\u91cc\u900f\u51fa\u3002\n\n"
+            "\u7b2c\u56db\u7ae0 \u771f\u76f8\n\u95e8\u6253\u5f00\u4e86\u3002\n"
+        )
+        task = ConversionTask.objects.create(input_name="fallback.txt", source_text=source_text)
+        planner = FakeActBoundaryPlanner(
+            [
+                ActBoundary(1, "\u7b2c\u4e00\u5e55\uff1a\u5f00\u7aef", 1, 2),
+                ActBoundary(2, "\u7b2c\u4e8c\u5e55\uff1a\u5c55\u5f00", 2, 3),
+                ActBoundary(3, "\u7b2c\u4e09\u5e55\uff1a\u6536\u675f", 4, 4),
+            ]
+        )
+
+        with (
+            patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class,
+            patch("converter.services.pipeline.build_act_boundary_planner", return_value=planner),
+        ):
+            converter = converter_class.return_value
+            converter.convert_chapter.side_effect = [
+                scene_payload(number=10, source_chapter=1, title="\u96e8\u591c"),
+                scene_payload(number=10, source_chapter=2, title="\u540e\u53f0"),
+                scene_payload(number=10, source_chapter=3, title="\u51b7\u5149"),
+                scene_payload(number=10, source_chapter=4, title="\u771f\u76f8"),
+            ]
+
+            run_conversion_task(task)
+
+        task.refresh_from_db()
+        script = yaml.safe_load(task.script_yaml)
+        self.assertEqual([len(act["scenes"]) for act in script["acts"]], [1, 2, 1])
+
+    @override_settings(
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="test-key",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+        ANTHROPIC_MODEL="claude-test",
+        LLM_MAX_TOKENS=1000,
+    )
+    def test_pipeline_falls_back_when_act_boundary_planner_is_unavailable(self) -> None:
+        source_text = (
+            "\u7b2c\u4e00\u7ae0 \u96e8\u591c\n\u6797\u7167\uff1a\u5f00\u95e8\u3002\n\n"
+            "\u7b2c\u4e8c\u7ae0 \u540e\u53f0\n\u6c88\u5c9a\uff1a\u542c\u89c1\u4e86\u5417\uff1f\n\n"
+            "\u7b2c\u4e09\u7ae0 \u51b7\u5149\n\u706f\u5149\u4ece\u95e8\u7f1d\u91cc\u900f\u51fa\u3002\n\n"
+            "\u7b2c\u56db\u7ae0 \u771f\u76f8\n\u95e8\u6253\u5f00\u4e86\u3002\n"
+        )
+        task = ConversionTask.objects.create(input_name="unavailable.txt", source_text=source_text)
+
+        with (
+            patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class,
+            patch("converter.services.pipeline.build_act_boundary_planner", side_effect=RuntimeError("timeout")),
+        ):
+            converter = converter_class.return_value
+            converter.convert_chapter.side_effect = [
+                scene_payload(number=10, source_chapter=1, title="\u96e8\u591c"),
+                scene_payload(number=10, source_chapter=2, title="\u540e\u53f0"),
+                scene_payload(number=10, source_chapter=3, title="\u51b7\u5149"),
+                scene_payload(number=10, source_chapter=4, title="\u771f\u76f8"),
+            ]
+
+            run_conversion_task(task)
+
+        task.refresh_from_db()
+        self.assertEqual(task.status, ConversionTask.Status.COMPLETED)
+        script = yaml.safe_load(task.script_yaml)
+        self.assertEqual([len(act["scenes"]) for act in script["acts"]], [1, 2, 1])
 
     @override_settings(
         LLM_PROVIDER="qwen",
@@ -881,6 +1170,16 @@ class ConversionPipelineTests(TestCase):
             max_tokens=1000,
             json_mode=True,
         )
+
+
+class FakeActBoundaryPlanner:
+    def __init__(self, boundaries: list[ActBoundary]) -> None:
+        self.boundaries = boundaries
+        self.seen_scene_numbers: list[int] = []
+
+    def propose_boundaries(self, scenes: list[dict[str, object]]) -> list[ActBoundary]:
+        self.seen_scene_numbers = [int(scene["number"]) for scene in scenes]
+        return self.boundaries
 
 
 def scene_payload(number: int, source_chapter: int, title: str) -> dict[str, object]:

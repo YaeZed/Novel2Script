@@ -70,6 +70,15 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 2. 更高级的 Act 大纲：在当前确定性三幕规则上引入可解释的模型级结构建议
 3. 前端 Phase 5 体验打磨：上传、进度反馈、对照编辑的完整验收
 
+### PR11.1 Act Boundary Update
+
+- 当前流程在所有 Scene 生成后，会先按全剧顺序重新编号。
+- `placeholder` 继续使用确定性三幕拆分。
+- 真实模型 provider 会在最终组装前额外读取场景标题、摘要、节拍概览和来源章节，建议开端 / 展开 / 收束的连续场景范围。
+- 后端只接受覆盖全部场景且无重叠、无空幕、无缺失的三幕边界；失败或不可用时回退到确定性拆分。
+- 长任务处理中保存的 partial 草稿只放在 `已处理部分`，不提前标记开端 / 展开 / 收束，避免后续新增场景导致幕归属漂移。
+- 前端手动拖拽或保存幕边界仍不属于当前能力。
+
 ### API 端点
 - `POST /api/convert` → `{task_id}`
 - `GET /api/status/<id>` → `{status, progress, chapters_done, total_chapters, error_message, llm_provider}`

@@ -509,3 +509,34 @@
   - `git diff --check`: passed; only CRLF normalization warnings.
   - Vite dev server available at `http://127.0.0.1:5173/` after elevated start; normal sandbox start failed with `spawn EPERM` from esbuild.
   - Browser screenshot automation was not available because `playwright` is not installed in the local Node REPL.
+
+## Session: 2026-06-07 Phase 5 PR11.1 Execution
+
+### PR11.1: model-driven act boundaries
+- **Status:** in progress
+- Actions taken:
+  - Restored `task_plan.md`, `findings.md`, and `progress.md` with the planning-with-files workflow.
+  - Ran session catchup; the unsynced context only repeated old initial planning setup and does not change PR11.1 scope.
+  - Fetched `origin/master`, switched local `master`, and fast-forwarded to PR11 merge commit `abaff79`.
+  - Attempted branch `codex/phase-5-pr11-1-act-boundaries`; Git could not create the nested refs directory in this Windows workspace.
+  - Created working branch `codex-phase-5-pr11-1-act-boundaries` after `.git/refs` permission required elevated branch creation.
+  - Recorded PR11.1 scope in `task_plan.md` and `findings.md`.
+- Current scope:
+  - Add backend model-assisted act boundary proposal from already generated scenes.
+  - Keep deterministic split as fallback and keep `placeholder` deterministic.
+  - Do not change compare-page interaction or add manual act boundary editing.
+- Hand-test feedback:
+  - User stopped the backend and noticed scenes previously under `收束` appeared under `展开`.
+  - Confirmed this came from partial drafts recalculating deterministic three-act splits as each new processed scene was persisted.
+  - Changed partial persistence to use a single `已处理部分` act; final completed scripts still use model-assisted or deterministic three-act boundaries.
+  - User retested with the six-section lighthouse sample. Final result grouped scenes 1-2 as `开端`, 3-5 as `展开`, and 6 as `收束`, with no partial drift observed.
+  - User found `背面写着` was extracted as a character in the same sample. Confirmed saved task also contained false `救船终于` evidence.
+  - Tightened character extraction to reject object/narration labels and embedded action fragments, and added prompt guidance so generated scenes treat these as action/direction details.
+  - User found chapter 3 dialogue/order drift in the compare page: 沈岚's later line appeared before the old administrator's earlier background information.
+  - Added chronological beat-order guidance to scene prompts and a backend source-anchor reorder pass for real model scene outputs.
+  - Added regression coverage for the lighthouse chapter 3 order case.
+  - Added `test/README.md` with manual fixture directory rules and `test/lighthouse-pr11-1.md` with the lighthouse hand-test sample and expected observations.
+- Validation after beat-order fix:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 46 tests.

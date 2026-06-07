@@ -26,6 +26,7 @@ CHINESE_PREFACED_DIALOGUE_RE = re.compile(
     r"[\uff1a:,\uff0c]\s*[\u201c\u300c\u300e]"
 )
 CHINESE_ACTION_RE = re.compile(
+    r"(?:^|[\s\uff0c,\u3002\uff1b;\u3001])"
     r"(?P<name>[\u4e00-\u9fff]{2,4})"
     r"(?:\u62ac\u5934|\u4f4e\u5934|\u56de\u5934|\u8f6c\u8eab|\u6447\u5934|\u70b9\u5934|"
     r"\u76b1\u7709|\u6c89\u9ed8|\u53f9\u6c14|\u7b11\u4e86|\u770b\u89c1|\u770b\u5411|"
@@ -77,6 +78,28 @@ PRONOUNS_AND_GENERIC_NAMES = {
     "\u6709\u4eba",
     "\u4f17\u4eba",
     "\u5927\u5bb6",
+}
+NON_CHARACTER_NAME_PARTS = {
+    "\u80cc\u9762",
+    "\u6b63\u9762",
+    "\u7eb8\u6761",
+    "\u8239\u7968",
+    "\u95e8\u7981",
+    "\u949f",
+    "\u706f",
+    "\u706f\u5854",
+    "\u641c\u6551\u8239",
+    "\u8d27\u8239",
+    "\u6d77\u9762",
+}
+NON_CHARACTER_NAME_SUFFIXES = {
+    "\u5199\u7740",
+    "\u8bb0\u7740",
+    "\u663e\u793a",
+    "\u770b\u89c1",
+    "\u770b\u5230",
+    "\u542c\u89c1",
+    "\u7ec8\u4e8e",
 }
 
 
@@ -215,6 +238,10 @@ def is_character_name(name: str) -> bool:
         return False
     lowered = name.lower()
     if lowered in METADATA_LABELS or name in PRONOUNS_AND_GENERIC_NAMES:
+        return False
+    if any(part in name for part in NON_CHARACTER_NAME_PARTS):
+        return False
+    if any(name.endswith(suffix) for suffix in NON_CHARACTER_NAME_SUFFIXES):
         return False
     if any(char.isdigit() for char in name):
         return False

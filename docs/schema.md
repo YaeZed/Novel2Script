@@ -17,6 +17,17 @@ PR7 起，后端会在所有章节 Scene 生成后做一次确定性拼装：
 
 这个规则先保证长篇结果可浏览、可编辑；更复杂的模型级 Act 大纲放到后续 PR。
 
+## PR11.1 Act Boundary Note
+
+PR11.1 keeps the same YAML shape. It only changes how the backend chooses which scenes belong to each act:
+
+- `placeholder` mode keeps the deterministic split from PR7.
+- Real model providers may propose three act ranges from the ordered scene outline after all scenes are generated.
+- The backend accepts a proposal only when ranges are ordered, contiguous, non-empty, and cover every scene exactly once.
+- Invalid or unavailable proposals fall back to the deterministic split.
+- Partial drafts saved during processing use a single `已处理部分` act, so scenes do not move between `展开` and `收束` while later chapters are still being generated.
+- Model rationales are used only for validation/debug context in this PR and are not written into the YAML schema.
+
 ## PR8 Retry And Manual Review Note
 
 PR8 起，真实模型转换单章时会按 `LLM_SCENE_MAX_ATTEMPTS` 做章节级重试。重试后仍无法得到合法 Scene 时，后端会生成一个符合现有 Schema 的“需人工处理”场景：

@@ -1,6 +1,10 @@
 from django.conf import settings
 
 from converter.models import ConversionTask
+from converter.services.act_boundary_planner import (
+    build_act_boundary_planner,
+    propose_act_boundaries_safely,
+)
 from converter.services.character_extractor import extract_character_table
 from converter.services.chapter_splitter import Chapter, split_chapters
 from converter.services.llm_scene_converter import (
@@ -12,7 +16,11 @@ from converter.services.conversion_recovery import (
     build_manual_review_message,
     convert_chapter_with_retry,
 )
-from converter.services.script_assembler import assemble_script
+from converter.services.script_assembler import (
+    assemble_partial_script,
+    assemble_script,
+    normalize_scene_sequence,
+)
 from schema.script_schema import build_scene, dump_script_yaml, validate_script
 
 
@@ -30,7 +38,8 @@ def run_conversion_task(task: ConversionTask) -> None:
     task.progress = 25
     task.save(update_fields=["total_chapters", "chapters", "characters", "progress", "updated_at"])
 
-    scene_converter = build_scene_converter()
+    provider = resolve_llm_provider()
+    scene_converter = build_scene_converter(provider)
     scenes = []
     manual_review_labels = []
 
@@ -43,10 +52,17 @@ def run_conversion_task(task: ConversionTask) -> None:
         task.progress = conversion_progress(len(scenes), len(chapters))
         persist_partial_script(task, characters, scenes)
 
+    normalized_scenes = normalize_scene_sequence(scenes)
+    try:
+        act_boundary_planner = build_act_boundary_planner(provider)
+    except Exception:
+        act_boundary_planner = None
+    act_boundaries = propose_act_boundaries_safely(act_boundary_planner, normalized_scenes)
     script = assemble_script(
         title=task.input_name or "Untitled",
         characters=characters,
-        scenes=scenes,
+        scenes=normalized_scenes,
+        act_boundaries=act_boundaries,
     )
     validate_script(script)
 
@@ -80,7 +96,7 @@ def persist_partial_script(
         task.save(update_fields=["chapters_done", "progress", "updated_at"])
         return
 
-    script = assemble_script(
+    script = assemble_partial_script(
         title=task.input_name or "Untitled",
         characters=characters,
         scenes=scenes,
@@ -101,8 +117,8 @@ class PlaceholderSceneConverter:
         return build_scene(chapter_to_payload(chapter), characters=characters)
 
 
-def build_scene_converter() -> SceneConverter:
-    provider = resolve_llm_provider()
+def build_scene_converter(provider: str | None = None) -> SceneConverter:
+    provider = provider or resolve_llm_provider()
     if provider == "placeholder":
         return PlaceholderSceneConverter()
 

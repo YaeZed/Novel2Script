@@ -12,6 +12,8 @@ from converter.services.chapter_splitter import Chapter
 
 VALID_BEAT_TYPES = {"dialogue", "action", "direction"}
 FENCED_JSON_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
+MIN_CONTENT_ANCHOR_LENGTH = 3
+MAX_CONTENT_ANCHOR_LENGTH = 30
 
 
 class SceneConversionError(RuntimeError):
@@ -117,9 +119,11 @@ def build_chapter_prompt(chapter: Chapter, characters: list[dict[str, str]]) -> 
         "Keep the beats concise but specific enough for an author to edit.\n\n"
         "Grounding rules:\n"
         "- Use only the provided chapter text as source material.\n"
+        "- Keep beats in the same chronological order as the chapter text; do not move later dialogue before earlier narration.\n"
         "- Treat the character table as source-derived evidence from the full input.\n"
         "- Prefer character names from the table for dialogue beats.\n"
         "- Add a new dialogue character only when that exact name appears in this chapter.\n"
+        "- Do not treat object or narration labels as characters, such as 背面写着, 纸条写着, 门禁册显示, or 潮汐表记录.\n"
         "- Do not merge this chapter with other chapters or create act-level structure.\n\n"
         f"Known characters JSON:\n{character_json}\n\n"
         f"Chapter index: {chapter.index}\n"
@@ -209,6 +213,7 @@ def normalize_scene_payload(payload: dict[str, Any], chapter: Chapter) -> dict[s
         raise SceneConversionError("LLM scene must include at least one beat.")
 
     beats = [normalize_beat(beat, index) for index, beat in enumerate(beats_payload, start=1)]
+    beats = order_beats_by_source_position(beats, chapter.text)
     summary = clean_text(payload.get("summary")) or first_line(chapter.text)
 
     return {
@@ -240,6 +245,120 @@ def normalize_beat(payload: Any, index: int) -> dict[str, str]:
     if parenthetical:
         beat["parenthetical"] = parenthetical[:120]
     return beat
+
+
+def order_beats_by_source_position(
+    beats: list[dict[str, str]],
+    chapter_text: str,
+) -> list[dict[str, str]]:
+    if len(beats) < 2:
+        return beats
+
+    normalized_source, source_index_map = normalize_match_text(chapter_text)
+    if not normalized_source:
+        return beats
+
+    ordered = []
+    last_position = -1
+    changed = False
+    for original_index, beat in enumerate(beats):
+        position = find_beat_source_position(beat, normalized_source, source_index_map)
+        if position is None:
+            position = last_position
+        else:
+            if position < last_position:
+                changed = True
+            last_position = position
+        ordered.append((position, original_index, beat))
+
+    if not changed:
+        return beats
+
+    return [beat for _, _, beat in sorted(ordered, key=lambda item: (item[0], item[1]))]
+
+
+def find_beat_source_position(
+    beat: dict[str, str],
+    normalized_source: str,
+    source_index_map: list[int],
+) -> int | None:
+    candidates: list[tuple[int, int]] = []
+
+    content = normalize_match_text(beat.get("content", ""))[0]
+    content_match = find_text_anchor_position(content, normalized_source, source_index_map)
+    if content_match is not None:
+        candidates.append(content_match)
+
+    character = normalize_match_text(beat.get("character", ""))[0]
+    if character:
+        character_position = unique_source_position(character, normalized_source, source_index_map)
+        if character_position is not None:
+            candidates.append((len(character) * 2, character_position))
+
+    if not candidates:
+        return None
+
+    _, position = max(candidates, key=lambda item: (item[0], -item[1]))
+    return position
+
+
+def find_text_anchor_position(
+    text: str,
+    normalized_source: str,
+    source_index_map: list[int],
+) -> tuple[int, int] | None:
+    if len(text) < MIN_CONTENT_ANCHOR_LENGTH:
+        return None
+
+    exact_index = normalized_source.find(text)
+    if exact_index != -1:
+        return (len(text) * 3, source_index_map[exact_index])
+
+    max_length = min(MAX_CONTENT_ANCHOR_LENGTH, len(text))
+    best: tuple[int, int] | None = None
+    seen: set[str] = set()
+    for length in range(max_length, MIN_CONTENT_ANCHOR_LENGTH - 1, -1):
+        for start in range(0, len(text) - length + 1):
+            anchor = text[start : start + length]
+            if anchor in seen:
+                continue
+            seen.add(anchor)
+            source_index = normalized_source.find(anchor)
+            if source_index == -1:
+                continue
+            if length == MIN_CONTENT_ANCHOR_LENGTH and normalized_source.count(anchor) > 1:
+                continue
+            candidate = (length, source_index_map[source_index])
+            if best is None or candidate[0] > best[0] or (
+                candidate[0] == best[0] and candidate[1] < best[1]
+            ):
+                best = candidate
+        if best is not None:
+            return best
+    return best
+
+
+def unique_source_position(
+    text: str,
+    normalized_source: str,
+    source_index_map: list[int],
+) -> int | None:
+    source_index = normalized_source.find(text)
+    if source_index == -1:
+        return None
+    if normalized_source.find(text, source_index + 1) != -1:
+        return None
+    return source_index_map[source_index]
+
+
+def normalize_match_text(text: Any) -> tuple[str, list[int]]:
+    normalized_chars: list[str] = []
+    source_indices: list[int] = []
+    for index, char in enumerate(clean_text(text)):
+        if char.isalnum():
+            normalized_chars.append(char.lower())
+            source_indices.append(index)
+    return "".join(normalized_chars), source_indices
 
 
 def clean_text(value: Any) -> str:

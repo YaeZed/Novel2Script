@@ -1,5 +1,13 @@
 # CODEX Guide
 
+## PR11.1 Current Rule
+
+- Current branch: `codex-phase-5-pr11-1-act-boundaries`.
+- Scope: add backend model-assisted three-act boundary proposal based on generated story scenes.
+- The model may only propose act names and inclusive scene ranges. It must not rewrite scenes, beats, characters, or source references in this PR.
+- `placeholder` mode and invalid/unavailable model output must use the existing deterministic act split so no-key demos and long-running conversions remain reliable.
+- Frontend compare interaction, drag/drop boundary editing, save APIs, and scene generation prompts are out of scope.
+
 ## Current Rule
 
 - 当前分支：`codex-phase-5-pr11-compare-view`，从 PR10.1 合并后的 `master` 开出。

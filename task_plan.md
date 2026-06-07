@@ -396,3 +396,26 @@ Phase 5
   - fuller character extraction
   - multi-chapter assembly and Act grouping
   - retry and manual-review fallback
+
+## 2026-06-07 PR11.1 Execution Plan
+
+- Problem: The current act labels imply semantic structure (`开端 / 展开 / 收束`), but the backend still splits scenes by count. This can mislead authors when the actual turning points do not sit at 25% / 75% of the scene list.
+- User impact: The compare/review workspace should show act sections that follow story events, not just pagination. Better act boundaries make the draft easier to scan and reduce manual restructuring work.
+- Scope:
+  - Add a backend act-boundary proposal step after scene generation and before final script assembly.
+  - Real model providers may propose strict JSON boundaries from ordered scene titles, summaries, beats, and source chapters.
+  - Validate that proposed acts are ordered, non-empty, cover every scene exactly once, and preserve existing scene numbering/source fields.
+  - Fall back to the existing deterministic split when the provider is `placeholder`, when model output is unavailable/invalid, or when validation fails.
+  - Keep frontend compare interactions, drag/drop editing, save APIs, and scene generation prompts out of this PR.
+- First-principles framing:
+  - The product problem is not "make prettier act labels"; it is "make structural sections correspond to dramatic event turns."
+  - The direct path is a small post-processing step that consumes already generated scenes. It avoids re-generating scenes and keeps chapter retry/manual-review behavior intact.
+  - From zero, the boundary contract should be `ordered scenes -> act boundary JSON -> validated acts`, with deterministic assembly as the reliability floor.
+- Validation target:
+  - Backend unit tests for valid model boundaries, invalid/lossy boundaries fallback, placeholder fallback, and pipeline persistence.
+  - `python -m compileall backend`
+  - `python manage.py check`
+  - `python manage.py test`
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`
+  - `node node_modules\vite\bin\vite.js build`
+  - `git diff --check`
