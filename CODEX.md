@@ -36,7 +36,8 @@ demo/
 │       ├── components/       # Reusable UI components
 │       ├── composables/      # Vue state and polling logic
 │       ├── pages/            # Route-level pages
-│       └── schemas/          # zod schemas for script YAML
+│       ├── schemas/          # zod schemas for script YAML
+│       └── types/            # Shared frontend-only TypeScript types
 ├── backend/                  # Django + DRF API
 │   ├── converter/            # Conversion task app
 │   │   └── services/         # Pipeline, chapter splitting, EPUB parsing
@@ -50,7 +51,7 @@ demo/
 └── problems.md               # 已发现问题、根因和修复复盘
 ```
 
-新目录只放对应职责的文件。跨层共享约定先写到 `docs/` 或 `CODEX.md`，再进入实现。
+新目录只放对应职责的文件。`frontend/src/types/` 只放跨组件共享的前端类型；页面内部独用类型留在页面文件内。跨层共享约定先写到 `docs/` 或 `CODEX.md`，再进入实现。
 
 ## 开发命令
 

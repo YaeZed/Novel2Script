@@ -52,6 +52,47 @@
 ## Visual/Browser Findings
 -
 
+## 2026-06-07 PR12 Reading Experience Findings
+
+### First-principles framing
+- The compare page is the author's review workspace. Its bottleneck is sustained reading and remembering follow-up points, not conversion logic.
+- Reading preferences should be reversible workspace state. They should not mutate generated script content or require backend persistence.
+- Scene marks are review metadata. Local persistence is the lowest-risk useful version because it works offline, avoids schema/API churn, and keeps the YAML draft clean.
+
+### Scope decisions
+- PR12 should add theme, reading size/density, and per-scene mark status.
+- Scene marks should appear both in the scene list and the active scene area so the author sees status before and during reading.
+- Use reusable components for appearance controls and scene mark controls. `ComparePage.vue` should orchestrate state, not own every control's markup.
+- Keep backend save/sync of marks for a later product decision. Once multiple devices or accounts exist, marks will need an API and conflict rules.
+
+### YAML highlight hand-test findings
+- User found three interaction bugs in the YAML color marking menu:
+  - The menu appeared, but the selected text looked covered.
+  - Choosing a color did not visibly change the draft.
+  - Clicking the close button reopened the menu immediately.
+- Root causes:
+  - The editor uses a mirror layer plus a textarea layer. The scoped selector `.compare-pane .yaml-editor` had higher specificity than `.yaml-highlight-input`, so the textarea text/background stayed visible and covered the mirror highlight layer.
+  - After a color was applied, the textarea selection stayed expanded, so the browser selection paint continued to sit on top of the visual mark.
+  - The global `selectionchange` listener reopened the menu for the same still-selected range after the close button hid it.
+- Fix decisions:
+  - Keep the reusable `YamlHighlightEditor` boundary; compare page only owns highlight data.
+  - Make the highlight textarea transparent with a higher-specificity selector.
+  - Collapse the textarea selection after applying a mark.
+  - Track a dismissed selection range so close is stable until the user changes selection.
+
+### Chinese YAML display findings
+- User asked whether YAML field names can be changed to Chinese without affecting backend processing.
+- Decision:
+  - Keep backend result format and schema contract unchanged.
+  - Convert backend YAML to Chinese field labels only in the compare-page editing surface.
+  - Convert Chinese field labels back to internal keys before frontend validation and scene parsing.
+- Reason:
+  - Directly changing schema keys would affect generation, validation, historical tasks, and backend output.
+  - Display-layer mapping gives Chinese-first UX while preserving the existing API and storage contract.
+- Highlight alignment risk:
+  - Color marks are position-based, so field-label localization and typography changes can make old stored ranges point to the wrong content.
+  - Stored highlight text should be used to realign ranges; if the text cannot be found, drop the stale mark.
+
 ## 2026-06-06 PR9 Upload Page Findings
 
 ### First-principles framing

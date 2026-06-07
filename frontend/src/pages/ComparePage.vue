@@ -1,27 +1,62 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RefreshCw } from "@lucide/vue";
-import { YAMLException, load } from "js-yaml";
+import { YAMLException, dump, load } from "js-yaml";
 import { ZodError, type ZodIssue } from "zod";
 
 import { getResult, getStatus, type ResultResponse, type StatusResponse } from "../api/client";
 import AppButton from "../components/AppButton.vue";
+import ReadingControls from "../components/ReadingControls.vue";
 import SceneNavigator from "../components/SceneNavigator.vue";
+import SceneMarkControls from "../components/SceneMarkControls.vue";
 import ScriptValidationPanel from "../components/ScriptValidationPanel.vue";
 import SectionHeader from "../components/SectionHeader.vue";
 import StatusPill from "../components/StatusPill.vue";
+import YamlHighlightEditor from "../components/YamlHighlightEditor.vue";
 import { scriptSchema, type ScriptDocument } from "../schemas/script";
+import type { HighlightColor, SceneMark, TextHighlight } from "../types/review";
 
 const props = defineProps<{
   taskId: string;
 }>();
 
 type Scene = ScriptDocument["acts"][number]["scenes"][number];
+type ReadingTheme = "light" | "dark";
+type ReadingSize = "compact" | "comfortable" | "spacious";
+
+const READING_PREFS_STORAGE_KEY = "novel-script-reader-preferences";
+const CHINESE_YAML_KEYS: Record<string, string> = {
+  标题: "title",
+  角色表: "characters",
+  姓名: "name",
+  身份: "role",
+  说明: "description",
+  幕: "acts",
+  编号: "number",
+  场: "scenes",
+  来源章节: "source_chapter",
+  摘要: "summary",
+  节拍: "beats",
+  类型: "type",
+  人物: "character",
+  内容: "content",
+  括号提示: "parenthetical",
+};
+const CHINESE_BEAT_TYPES: Record<string, string> = {
+  对白: "dialogue",
+  动作: "action",
+  舞台指示: "direction",
+};
+const ENGLISH_BEAT_TYPE_LABELS: Record<string, string> = {
+  dialogue: "对白",
+  action: "动作",
+  direction: "舞台指示",
+};
 
 const result = ref<ResultResponse | null>(null);
 const status = ref<StatusResponse | null>(null);
 const yamlText = ref("");
-const yamlEditor = ref<HTMLTextAreaElement | null>(null);
+const yamlEditor = ref<InstanceType<typeof YamlHighlightEditor> | null>(null);
 const sourceTextPane = ref<HTMLElement | null>(null);
 const activeScene = ref(0);
 const sourceScrollByScene = ref<Record<string, number>>({});
@@ -30,9 +65,14 @@ const validationStatus = ref<"idle" | "dirty" | "valid" | "invalid">("idle");
 const validationDetail = ref("");
 const lastValidScript = ref<ScriptDocument | null>(null);
 const serverYamlText = ref("");
+const previousYamlText = ref("");
 const pendingResult = ref<ResultResponse | null>(null);
 const hasPendingServerUpdate = ref(false);
 const hasLocalDraftEdits = ref(false);
+const readingTheme = ref<ReadingTheme>("light");
+const readingSize = ref<ReadingSize>("comfortable");
+const sceneMarks = ref<Record<string, SceneMark>>({});
+const yamlHighlights = ref<TextHighlight[]>([]);
 let pollingTimer: number | undefined;
 
 const progressValue = computed(() => {
@@ -116,6 +156,7 @@ const sceneItems = computed(() => (
     sourceTitle: chapterTitleForScene(entry.scene),
     beatCount: entry.scene.beats.length,
     summary: entry.scene.summary,
+    mark: sceneMarkFor(entry.scene),
   }))
 ));
 
@@ -128,6 +169,29 @@ const currentSceneCharacters = computed(() => {
   return names.length ? names.join("、") : "旁白/动作";
 });
 
+const activeSceneMark = computed(() => sceneMarkFor(currentScene.value));
+
+const activeSceneMarkLabel = computed(() => markLabel(activeSceneMark.value));
+
+const sceneMarkCounts = computed(() => (
+  scenes.value.reduce(
+    (counts, scene) => {
+      const mark = sceneMarkFor(scene);
+      if (mark === "review") counts.review += 1;
+      if (mark === "done") counts.done += 1;
+      return counts;
+    },
+    { review: 0, done: 0 },
+  )
+));
+
+const reviewToolbarDescription = computed(() => {
+  if (!scenes.value.length) {
+    return "等待剧本内容载入";
+  }
+  return `待处理 ${sceneMarkCounts.value.review} 场 · 已确认 ${sceneMarkCounts.value.done} 场`;
+});
+
 const currentSceneFacts = computed(() => {
   if (!currentScene.value) {
     return [];
@@ -137,6 +201,7 @@ const currentSceneFacts = computed(() => {
     { label: "来源", value: chapterTitleForScene(currentScene.value) },
     { label: "结构", value: `${currentScene.value.beats.length} 个节拍` },
     { label: "角色", value: currentSceneCharacters.value },
+    { label: "标记", value: activeSceneMarkLabel.value },
   ];
 });
 
@@ -168,6 +233,36 @@ function sceneCharacterNames(scene: Scene | undefined) {
   ).slice(0, 4);
 }
 
+function markLabel(mark: SceneMark) {
+  if (mark === "review") return "待处理";
+  if (mark === "done") return "已确认";
+  return "未标记";
+}
+
+function sceneMarkFor(scene: Scene | undefined): SceneMark {
+  const key = sceneMarkKey(scene);
+  if (!key) {
+    return "none";
+  }
+  return normalizeSceneMark(sceneMarks.value[key]);
+}
+
+function updateActiveSceneMark(mark: SceneMark) {
+  const key = sceneMarkKey(currentScene.value);
+  if (!key) {
+    return;
+  }
+
+  const nextMarks = { ...sceneMarks.value };
+  if (mark === "none") {
+    delete nextMarks[key];
+  } else {
+    nextMarks[key] = mark;
+  }
+  sceneMarks.value = nextMarks;
+  persistSceneMarks();
+}
+
 async function refreshCompareState() {
   try {
     status.value = await getStatus(props.taskId);
@@ -197,7 +292,8 @@ function applyResult(
   nextResult: ResultResponse,
   options: { force?: boolean; resetSelection?: boolean } = {},
 ) {
-  const nextYaml = nextResult.script_yaml || "";
+  const nextServerYaml = nextResult.script_yaml || "";
+  const nextYaml = localizeYamlText(nextServerYaml);
   if (!nextYaml.trim()) {
     result.value = nextResult;
     return;
@@ -218,8 +314,11 @@ function applyResult(
 
   const activeIdentity = sceneIdentity(currentScene.value);
   result.value = nextResult;
+  rebaseYamlHighlights(serverYamlText.value, nextYaml);
   yamlText.value = nextYaml;
+  previousYamlText.value = nextYaml;
   serverYamlText.value = nextYaml;
+  loadYamlHighlights();
   pendingResult.value = null;
   hasPendingServerUpdate.value = false;
   hasLocalDraftEdits.value = false;
@@ -251,7 +350,7 @@ function validateYaml() {
   }
 
   try {
-    const parsed = scriptSchema.parse(load(yamlText.value));
+    const parsed = parseDisplayedYaml(yamlText.value);
     lastValidScript.value = parsed;
     validationStatus.value = "valid";
     validationDetail.value = "剧本结构完整，可以继续编辑。";
@@ -263,10 +362,41 @@ function validateYaml() {
 
 function markDirty() {
   hasLocalDraftEdits.value = true;
+  rebaseYamlHighlights(previousYamlText.value, yamlText.value);
+  previousYamlText.value = yamlText.value;
   if (validationStatus.value === "valid" || validationStatus.value === "invalid") {
     validationStatus.value = "dirty";
     validationDetail.value = "当前修改尚未校验；左侧仍显示上一次有效结构。";
   }
+}
+
+function addYamlHighlight(highlight: Omit<TextHighlight, "id">) {
+  const normalized = normalizeHighlight({
+    ...highlight,
+    id: createHighlightId(),
+  }, yamlText.value);
+  if (!normalized) {
+    return;
+  }
+
+  const nextHighlights = yamlHighlights.value
+    .filter((item) => item.end <= normalized.start || item.start >= normalized.end);
+  nextHighlights.push(normalized);
+  yamlHighlights.value = nextHighlights.sort((left, right) => left.start - right.start);
+  persistYamlHighlights();
+}
+
+function removeYamlHighlight(id: string) {
+  if (!id) {
+    return;
+  }
+  yamlHighlights.value = yamlHighlights.value.filter((highlight) => highlight.id !== id);
+  persistYamlHighlights();
+}
+
+function clearYamlHighlights() {
+  yamlHighlights.value = [];
+  persistYamlHighlights();
 }
 
 function formatValidationError(caught: unknown) {
@@ -287,7 +417,7 @@ function formatZodIssue(issue: ZodIssue | undefined) {
   const path = issue.path.join(".");
   const location = humanizePath(issue.path);
   if (issue.code === "invalid_enum_value" && path.endsWith(".type")) {
-    return `${location}：type 只能是 dialogue、action 或 direction，当前是 ${String(issue.received)}。`;
+    return `${location}：类型只能是“对白”“动作”或“舞台指示”，当前是 ${beatTypeLabel(String(issue.received))}。`;
   }
   if (issue.code === "invalid_type") {
     return `${location}：字段类型不正确，期望 ${issue.expected}。`;
@@ -317,6 +447,76 @@ function humanizePath(path: Array<string | number>) {
     }
   }
   return parts.join(" / ") || "当前剧本";
+}
+
+function parseDisplayedYaml(text: string): ScriptDocument {
+  return scriptSchema.parse(toInternalYamlValue(load(text)));
+}
+
+function localizeYamlText(text: string) {
+  if (!text.trim()) {
+    return "";
+  }
+
+  try {
+    return dump(toDisplayedYamlValue(load(text)), {
+      lineWidth: -1,
+      noRefs: true,
+      sortKeys: false,
+    });
+  } catch {
+    return text;
+  }
+}
+
+function toInternalYamlValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(toInternalYamlValue);
+  }
+  if (!isPlainRecord(value)) {
+    return value;
+  }
+
+  const nextValue: Record<string, unknown> = {};
+  for (const [key, childValue] of Object.entries(value)) {
+    const internalKey = CHINESE_YAML_KEYS[key] ?? key;
+    const normalizedValue = toInternalYamlValue(childValue);
+    nextValue[internalKey] = internalKey === "type" && typeof normalizedValue === "string"
+      ? CHINESE_BEAT_TYPES[normalizedValue] ?? normalizedValue
+      : normalizedValue;
+  }
+  return nextValue;
+}
+
+function toDisplayedYamlValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(toDisplayedYamlValue);
+  }
+  if (!isPlainRecord(value)) {
+    return value;
+  }
+
+  const nextValue: Record<string, unknown> = {};
+  for (const [key, childValue] of Object.entries(value)) {
+    const displayedKey = englishYamlKeyLabel(key);
+    const normalizedValue = toDisplayedYamlValue(childValue);
+    nextValue[displayedKey] = key === "type" && typeof normalizedValue === "string"
+      ? ENGLISH_BEAT_TYPE_LABELS[normalizedValue] ?? normalizedValue
+      : normalizedValue;
+  }
+  return nextValue;
+}
+
+function englishYamlKeyLabel(key: string) {
+  return Object.entries(CHINESE_YAML_KEYS).find(([, internalKey]) => internalKey === key)?.[0] ?? key;
+}
+
+function beatTypeLabel(value: string) {
+  return ENGLISH_BEAT_TYPE_LABELS[value] ?? value;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function downloadYaml() {
@@ -377,6 +577,204 @@ function sceneIdentity(scene: ScriptDocument["acts"][number]["scenes"][number] |
   return `${scene.source_chapter}:${scene.title}`;
 }
 
+function sceneMarkKey(scene: ScriptDocument["acts"][number]["scenes"][number] | undefined) {
+  if (!scene) {
+    return "";
+  }
+  return `${scene.source_chapter}:${scene.number}`;
+}
+
+function normalizeReadingTheme(value: unknown): ReadingTheme {
+  return value === "dark" ? "dark" : "light";
+}
+
+function normalizeReadingSize(value: unknown): ReadingSize {
+  if (value === "compact" || value === "spacious") {
+    return value;
+  }
+  return "comfortable";
+}
+
+function normalizeSceneMark(value: unknown): SceneMark {
+  if (value === "review" || value === "done") {
+    return value;
+  }
+  return "none";
+}
+
+function normalizeHighlightColor(value: unknown): HighlightColor {
+  if (value === "red" || value === "orange" || value === "yellow" || value === "green" || value === "blue") {
+    return value;
+  }
+  return "yellow";
+}
+
+function normalizeHighlight(value: unknown, text: string): TextHighlight | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<TextHighlight>;
+  const start = Number(candidate.start);
+  const end = Number(candidate.end);
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start) {
+    return null;
+  }
+
+  const highlightedText = text.slice(start, Math.min(end, text.length));
+  const storedText = typeof candidate.text === "string" && candidate.text.trim() ? candidate.text : highlightedText;
+  if (!storedText.trim()) {
+    return null;
+  }
+
+  const alignedRange = end <= text.length && highlightedText === storedText
+    ? { start, end }
+    : realignHighlightRange(storedText, text, start);
+  if (!alignedRange) {
+    return null;
+  }
+
+  return {
+    id: typeof candidate.id === "string" && candidate.id ? candidate.id : createHighlightId(),
+    start: alignedRange.start,
+    end: alignedRange.end,
+    color: normalizeHighlightColor(candidate.color),
+    text: storedText,
+  };
+}
+
+function realignHighlightRange(highlightedText: string, text: string, previousStart: number) {
+  const target = highlightedText.trim();
+  if (!target) {
+    return null;
+  }
+
+  const matches: number[] = [];
+  let searchStart = 0;
+  while (searchStart < text.length) {
+    const nextIndex = text.indexOf(highlightedText, searchStart);
+    if (nextIndex < 0) {
+      break;
+    }
+    matches.push(nextIndex);
+    searchStart = nextIndex + Math.max(highlightedText.length, 1);
+  }
+
+  if (!matches.length) {
+    return null;
+  }
+
+  const start = matches.reduce((best, next) => (
+    Math.abs(next - previousStart) < Math.abs(best - previousStart) ? next : best
+  ));
+  return {
+    start,
+    end: start + highlightedText.length,
+  };
+}
+
+function createHighlightId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function loadReadingPreferences() {
+  const stored = readJson<Record<string, unknown>>(READING_PREFS_STORAGE_KEY);
+  readingTheme.value = normalizeReadingTheme(stored?.theme);
+  readingSize.value = normalizeReadingSize(stored?.size);
+}
+
+function persistReadingPreferences() {
+  writeJson(READING_PREFS_STORAGE_KEY, {
+    theme: readingTheme.value,
+    size: readingSize.value,
+  });
+}
+
+function loadSceneMarks() {
+  const stored = readJson<Record<string, unknown>>(sceneMarksStorageKey());
+  const nextMarks: Record<string, SceneMark> = {};
+  for (const [key, value] of Object.entries(stored ?? {})) {
+    const mark = normalizeSceneMark(value);
+    if (mark !== "none") {
+      nextMarks[key] = mark;
+    }
+  }
+  sceneMarks.value = nextMarks;
+}
+
+function persistSceneMarks() {
+  writeJson(sceneMarksStorageKey(), sceneMarks.value);
+}
+
+function loadYamlHighlights() {
+  const stored = readJson<unknown[]>(yamlHighlightsStorageKey());
+  yamlHighlights.value = (stored ?? [])
+    .map((highlight) => normalizeHighlight(highlight, yamlText.value))
+    .filter((highlight): highlight is TextHighlight => Boolean(highlight));
+}
+
+function persistYamlHighlights() {
+  writeJson(yamlHighlightsStorageKey(), yamlHighlights.value);
+}
+
+function rebaseYamlHighlights(previousText: string, nextText: string) {
+  if (!previousText || previousText === nextText || !yamlHighlights.value.length) {
+    return;
+  }
+
+  const nextHighlights: TextHighlight[] = [];
+  let searchStart = 0;
+  for (const highlight of yamlHighlights.value) {
+    const originalText = previousText.slice(highlight.start, highlight.end) || highlight.text;
+    if (!originalText.trim()) {
+      continue;
+    }
+
+    const directMatch = nextText.slice(highlight.start, highlight.start + originalText.length) === originalText
+      ? highlight.start
+      : -1;
+    const nextStart = directMatch >= 0 ? directMatch : nextText.indexOf(originalText, searchStart);
+    if (nextStart < 0) {
+      continue;
+    }
+
+    nextHighlights.push({
+      ...highlight,
+      start: nextStart,
+      end: nextStart + originalText.length,
+      text: originalText,
+    });
+    searchStart = nextStart + originalText.length;
+  }
+
+  yamlHighlights.value = nextHighlights;
+  persistYamlHighlights();
+}
+
+function sceneMarksStorageKey() {
+  return `novel-script-scene-marks:${props.taskId}`;
+}
+
+function yamlHighlightsStorageKey() {
+  return `novel-script-yaml-highlights:${props.taskId}`;
+}
+
+function readJson<T>(key: string): T | null {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ? JSON.parse(value) as T : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeJson(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Local reading state is optional; the compare page should keep working without storage.
+  }
+}
+
 function restoreActiveScene(identity: string) {
   if (!identity) {
     activeScene.value = Math.min(activeScene.value, Math.max(scenes.value.length - 1, 0));
@@ -387,7 +785,7 @@ function restoreActiveScene(identity: string) {
 }
 
 function scrollYamlToActiveScene() {
-  const editor = yamlEditor.value;
+  const editor = yamlTextarea();
   if (!editor) {
     return;
   }
@@ -412,7 +810,7 @@ function findSceneYamlBlocks(lines: string[]) {
   const sceneBlocks: number[] = [];
 
   for (let index = 0; index < lines.length; index += 1) {
-    const match = /^(\s*)-\s+number:\s+\d+\s*$/.exec(lines[index]);
+    const match = /^(\s*)-\s+(?:编号|number):\s+\d+\s*$/.exec(lines[index]);
     if (!match) {
       continue;
     }
@@ -439,17 +837,25 @@ function findYamlListBlockEnd(lines: string[], startIndex: number, indent: numbe
 
 function isSceneYamlBlock(block: string[], indent: number) {
   const childIndent = indent + 2;
-  return block.some((line) => directChildLineStartsWith(line, childIndent, "source_chapter:"))
-    && block.some((line) => directChildLineStartsWith(line, childIndent, "beats:"));
+  return block.some((line) => directChildLineStartsWithAny(line, childIndent, ["来源章节:", "source_chapter:"]))
+    && block.some((line) => directChildLineStartsWithAny(line, childIndent, ["节拍:", "beats:"]));
 }
 
 function directChildLineStartsWith(line: string, indent: number, prefix: string) {
   return line.slice(0, indent) === " ".repeat(indent) && line.slice(indent).startsWith(prefix);
 }
 
+function directChildLineStartsWithAny(line: string, indent: number, prefixes: string[]) {
+  return prefixes.some((prefix) => directChildLineStartsWith(line, indent, prefix));
+}
+
 function yamlScrollTopForLine(editor: HTMLTextAreaElement, text: string, lineIndex: number) {
   const markerTop = measureTextareaLineTop(editor, text, lineIndex);
   return Math.max(0, markerTop - editor.clientHeight * 0.18);
+}
+
+function yamlTextarea() {
+  return yamlEditor.value?.getTextarea() ?? null;
 }
 
 function measureTextareaLineTop(editor: HTMLTextAreaElement, text: string, lineIndex: number) {
@@ -532,12 +938,18 @@ function stopPolling() {
   }
 }
 
-onMounted(startPolling);
+watch([readingTheme, readingSize], persistReadingPreferences);
+
+onMounted(() => {
+  loadReadingPreferences();
+  loadSceneMarks();
+  startPolling();
+});
 onBeforeUnmount(stopPolling);
 </script>
 
 <template>
-  <section class="compare-shell">
+  <section class="compare-shell" :data-reading-theme="readingTheme" :data-reading-size="readingSize">
     <div class="panel compare-progress-panel">
       <SectionHeader
         eyebrow="处理进度"
@@ -558,6 +970,25 @@ onBeforeUnmount(stopPolling);
           <RefreshCw :size="17" aria-hidden="true" />
           <span>载入新内容</span>
         </AppButton>
+      </div>
+    </div>
+
+    <div class="panel compare-toolbar-panel">
+      <SectionHeader
+        eyebrow="阅读工作台"
+        title="对照与标记"
+        :description="reviewToolbarDescription"
+      />
+      <div class="compare-toolbar">
+        <ReadingControls
+          v-model:theme="readingTheme"
+          v-model:size="readingSize"
+        />
+        <SceneMarkControls
+          :mark="activeSceneMark"
+          :disabled="!currentScene"
+          @update:mark="updateActiveSceneMark"
+        />
       </div>
     </div>
 
@@ -602,13 +1033,15 @@ onBeforeUnmount(stopPolling);
             @validate="validateYaml"
             @download="downloadYaml"
           />
-          <textarea
+          <YamlHighlightEditor
             ref="yamlEditor"
             v-model="yamlText"
-            class="yaml-editor"
-            aria-label="剧本草稿编辑区"
+            :highlights="yamlHighlights"
+            editor-label="剧本草稿编辑区"
             placeholder="处理好的剧本文件会显示在这里。"
-            spellcheck="false"
+            @add-highlight="addYamlHighlight"
+            @remove-highlight="removeYamlHighlight"
+            @clear-highlights="clearYamlHighlights"
             @input="markDirty"
             @blur="validateYaml"
           />
