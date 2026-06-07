@@ -32,6 +32,14 @@ npm run dev
 - LLM prompt 已加入 grounding 约束：只基于当前章节原文生成，优先使用角色表中的名字，不凭空补主角、关系或跨章剧情。
 - 所有章节 Scene 生成后，后端会统一按全剧顺序编号，并按章节进展组装为 Act。少于 3 个 Scene 保持单幕；3 个及以上 Scene 拆为开端、展开、收束三幕。
 
+## PR11.1 Act Boundary Behavior
+
+- `LLM_PROVIDER=placeholder` continues to use the deterministic act split.
+- Real model providers run one final act-boundary pass after all scenes are generated. The model sees ordered scene numbers, source chapters, titles, summaries, and beat outlines, then proposes three contiguous scene ranges for opening, development, and resolution.
+- The backend validates that every scene is covered exactly once. Invalid output, planner errors, or unavailable model calls fall back to the deterministic split instead of failing the conversion.
+- While a long conversion is still processing, the partial draft is grouped under `已处理部分` instead of opening/development/resolution. Final act labels appear only after completion.
+- This PR does not add frontend act editing; the output remains the same screenplay file structure.
+
 ## API
 
 - `POST /api/convert`：创建转换任务，返回 `{ task_id }`

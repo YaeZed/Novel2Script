@@ -286,6 +286,30 @@
 - A quoted attribution sample like `“别出声。”沈岚低声说。` proved character extraction worked, but placeholder output stayed as action, which made no-key demo behavior look weaker than the grounding layer.
 - Resolution: detect inline speaker labels after metadata labels, reject metadata labels as speakers even without a character table, split multi-label placeholder paragraphs when a real speaker label appears, and convert Chinese attributed quotes into dialogue beats.
 
+## 2026-06-07 PR11.1 Act Boundary Findings
+
+### First-principles framing
+- Act grouping should express story turns, not scene count. The existing deterministic 25% / 50% / 25% split is reliable but semantically weak.
+- The smallest useful improvement is a post-scene boundary proposal. Scene generation, retry fallback, partial result persistence, and compare-page editing can remain unchanged.
+- The model should not rewrite the script in this pass. It only proposes act names and inclusive scene-number ranges; the backend assembles acts from the existing scene list.
+
+### Scope decisions
+- `placeholder` mode stays deterministic. This keeps no-key demos stable and avoids pretending there was model-level structure analysis.
+- Real providers may call the configured LLM once per full script for act boundaries. If the call fails or returns invalid JSON, conversion continues with the deterministic split.
+- Validation must reject scene loss, duplicates, non-contiguous ranges, reversed ranges, empty acts, and scene numbers outside the generated scene list.
+- PR11.1 should not add frontend act editing. The compare view can consume the existing script YAML structure without API changes.
+
+### Hand-test feedback
+- User observed that a scene previously shown under `收束` later moved back to `展开` during partial result updates.
+- Root cause: partial drafts were reassembled after every processed chapter using the current processed scene count, so the deterministic three-act split kept recalculating as the partial script grew.
+- Fix: partial drafts now use a single `已处理部分` act. Opening/development/resolution labels are only applied to the final completed script.
+- User then found the lighthouse sample extracted `背面写着` as a character, and also produced `救船终于` in the character table.
+- Root cause: inline colon-label extraction treated object text like `背面写着：...` as a speaker, and narration action extraction could match a four-character fragment inside `搜救船终于看见`.
+- Fix: character extraction now filters non-character object/narration labels and requires Chinese action evidence to start at a text boundary. The scene prompt also explicitly tells the model to render object labels as action/direction, not dialogue characters.
+- User found chapter 3 beats were not in source order: the model placed 沈岚's later line before the old administrator's earlier information.
+- Root cause: real model scene conversion may reorder beats for dramatic flow even when all content is grounded in the chapter text.
+- Fix: chapter prompts now require chronological beat order, and backend scene normalization stable-sorts LLM beats by source-text anchors so compare-page reading follows the original chapter order.
+
 ## 2026-06-06 PR10 Progress Page Findings
 
 ### First-principles framing
