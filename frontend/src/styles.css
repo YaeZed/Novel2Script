@@ -671,12 +671,53 @@ main {
   padding: 0 16px;
 }
 
+.progress-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.compare-shell {
+  display: grid;
+  gap: 18px;
+  max-width: 1420px;
+  margin: 0 auto;
+}
+
+.compare-progress-panel {
+  padding: 18px 22px;
+}
+
+.compare-progress-panel .section-header {
+  margin-bottom: 12px;
+}
+
+.compare-progress-panel .section-header h1 {
+  font-size: 20px;
+}
+
+.compare-progress-readout .meter {
+  height: 10px;
+}
+
+.compare-update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #ebd08e;
+  border-radius: 8px;
+  color: #765100;
+  background: #fff7df;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .compare-layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 18px;
-  max-width: 1420px;
-  margin: 0 auto;
 }
 
 .scene-rail {
@@ -794,6 +835,7 @@ main {
   .snapshot-panel,
   .progress-panel,
   .chapter-preview-panel,
+  .compare-progress-panel,
   .compare-pane,
   .scene-rail {
     padding: 18px;
@@ -821,5 +863,10 @@ main {
   .chapter-preview-heading {
     display: grid;
     gap: 4px;
+  }
+
+  .compare-update-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

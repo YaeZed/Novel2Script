@@ -25,6 +25,7 @@ class ConversionCreatedSerializer(serializers.Serializer):
 class ConversionStatusSerializer(serializers.ModelSerializer):
     llm_provider = serializers.SerializerMethodField()
     chapters = serializers.SerializerMethodField()
+    can_view_result = serializers.SerializerMethodField()
 
     class Meta:
         model = ConversionTask
@@ -37,6 +38,7 @@ class ConversionStatusSerializer(serializers.ModelSerializer):
             "chapters_done",
             "total_chapters",
             "chapters",
+            "can_view_result",
             "error_message",
             "llm_provider",
         ]
@@ -56,6 +58,9 @@ class ConversionStatusSerializer(serializers.ModelSerializer):
             }
             for chapter in obj.chapters
         ]
+
+    def get_can_view_result(self, obj):
+        return bool(obj.script_yaml.strip())
 
 
 class ConversionResultSerializer(serializers.ModelSerializer):

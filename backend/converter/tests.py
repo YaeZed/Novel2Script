@@ -468,6 +468,7 @@ class ConversionApiTests(TestCase):
         payload = status_response.json()
 
         self.assertEqual(payload["status"], "completed")
+        self.assertIs(payload["can_view_result"], True)
         self.assertEqual(payload["input_name"], "sample.txt")
         self.assertEqual(payload["source_format"], "text")
         self.assertEqual(payload["total_chapters"], 2)
@@ -475,6 +476,18 @@ class ConversionApiTests(TestCase):
         self.assertEqual(payload["chapters"][0]["title"], "\u7b2c\u4e00\u7ae0 \u96e8\u591c")
         self.assertIn("\u6797\u7167", payload["chapters"][0]["excerpt"])
         self.assertNotIn("text", payload["chapters"][0])
+
+    def test_status_hides_result_entry_before_any_scene_is_ready(self) -> None:
+        task = ConversionTask.objects.create(
+            input_name="sample.txt",
+            source_format=ConversionTask.SourceFormat.TEXT,
+            source_text=SAMPLE_TEXT,
+            status=ConversionTask.Status.PROCESSING,
+        )
+
+        status_response = self.client.get(f"/api/status/{task.id}")
+
+        self.assertIs(status_response.json()["can_view_result"], False)
 
 
 class ConversionPipelineTests(TestCase):
@@ -646,6 +659,48 @@ class ConversionPipelineTests(TestCase):
         self.assertEqual(script["acts"][0]["title"], "\u7b2c\u4e00\u5e55\uff1a\u5168\u7bc7")
         self.assertEqual([scene["number"] for scene in script["acts"][0]["scenes"]], [1, 2])
         self.assertEqual(script["acts"][0]["scenes"][0]["title"], "\u96e8\u591c\u5bf9\u5cd9")
+
+    @override_settings(
+        ANTHROPIC_API_KEY="test-key",
+        OPENAI_API_KEY="",
+        QWEN_API_KEY="",
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_MODEL="claude-test",
+        LLM_MAX_TOKENS=1000,
+    )
+    def test_pipeline_persists_partial_script_after_each_chapter(self) -> None:
+        task = ConversionTask.objects.create(
+            input_name="partial.txt",
+            source_text=SAMPLE_TEXT,
+        )
+        observed: dict[str, object] = {}
+
+        def convert_side_effect(chapter, characters):  # noqa: ANN001, ARG001
+            if chapter.index == 1:
+                return scene_payload(number=1, source_chapter=1, title="\u96e8\u591c")
+
+            task.refresh_from_db()
+            observed["status"] = task.status
+            observed["chapters_done"] = task.chapters_done
+            observed["progress"] = task.progress
+            observed["script"] = yaml.safe_load(task.script_yaml)
+            return scene_payload(number=2, source_chapter=2, title="\u540e\u53f0")
+
+        with patch("converter.services.pipeline.ClaudeSceneConverter") as converter_class:
+            converter = converter_class.return_value
+            converter.convert_chapter.side_effect = convert_side_effect
+
+            run_conversion_task(task)
+
+        partial_script = observed["script"]
+        partial_scenes = [scene for act in partial_script["acts"] for scene in act["scenes"]]
+        self.assertEqual(observed["status"], ConversionTask.Status.PROCESSING)
+        self.assertEqual(observed["chapters_done"], 1)
+        self.assertGreater(observed["progress"], 25)
+        self.assertEqual([scene["title"] for scene in partial_scenes], ["\u96e8\u591c"])
+
+        task.refresh_from_db()
+        self.assertEqual(task.status, ConversionTask.Status.COMPLETED)
 
     @override_settings(
         LLM_PROVIDER="anthropic",

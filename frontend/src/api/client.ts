@@ -19,6 +19,7 @@ export interface StatusResponse {
     title: string;
     excerpt: string;
   }>;
+  can_view_result: boolean;
   error_message: string;
   llm_provider: string;
 }

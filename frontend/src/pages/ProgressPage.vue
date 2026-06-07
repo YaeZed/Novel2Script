@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Circle,
   FileText,
+  ListChecks,
   RefreshCw,
   RotateCcw,
 } from "@lucide/vue";
@@ -102,6 +103,7 @@ const sourceLabel = computed(() => {
 });
 
 const chapterRows = computed(() => status.value?.chapters ?? []);
+const canViewPartialResult = computed(() => Boolean(status.value?.can_view_result));
 
 const chapterSummary = computed(() => {
   if (!status.value) {
@@ -204,10 +206,18 @@ onMounted(start);
         </span>
       </div>
 
-      <div class="action-row">
+      <div class="action-row progress-actions">
         <AppButton variant="secondary" @click="refresh">
           <RefreshCw :size="17" aria-hidden="true" />
           <span>刷新</span>
+        </AppButton>
+        <AppButton
+          v-if="canViewPartialResult && status?.status !== 'completed'"
+          :to="`/compare/${taskId}`"
+          variant="secondary"
+        >
+          <ListChecks :size="17" aria-hidden="true" />
+          <span>查看已处理</span>
         </AppButton>
         <AppButton
           v-if="isDone && status?.status === 'completed'"

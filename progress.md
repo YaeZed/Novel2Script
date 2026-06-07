@@ -465,3 +465,24 @@
 - Decision:
   - Keep the current PR focused on PR10 progress page and EPUB count fix.
   - Add this as Phase 5 `PR10.1` so it can include the necessary backend partial-result persistence and compare-page polling behavior without bloating PR10.
+
+### PR10.1 incremental compare execution
+- **Status:** complete
+- Actions taken:
+  - Created branch `codex-phase-5-pr10-1-incremental-compare` from PR10-merged `master`.
+  - Added status response field `can_view_result` so the frontend only shows the compare entry when a real draft exists.
+  - Changed the pipeline to persist a schema-valid partial script after each processed chapter.
+  - Added progress-page “查看已处理” entry next to refresh while conversion is still running.
+  - Added a lightweight progress panel at the top of the compare page using existing `SectionHeader`, `StatusPill`, `AppButton`, `.panel`, `.progress-readout`, and `.meter` styling.
+  - Added compare-page polling that auto-loads new server drafts only when the user has not edited the current YAML text.
+  - Added a non-destructive “载入新内容” prompt when background processing finishes more chapters while the user has local edits.
+- Validation so far:
+  - `python manage.py test converter.tests.ConversionApiTests converter.tests.ConversionPipelineTests`: passed, 22 tests.
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+- Final validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 35 tests.
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
