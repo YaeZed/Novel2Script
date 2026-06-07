@@ -607,6 +607,20 @@
   - Chinese display mapping check: passed.
   - `git diff --check`: passed; only CRLF normalization warnings.
 
+## Session: 2026-06-07 Neat-Freak Sync After PR13
+
+### Documentation and memory cleanup
+- **Status:** complete
+- Actions taken:
+  - Confirmed local `master` is synced to `origin/master` at PR13 merge commit `435a8fe`.
+  - Audited root markdown files, `docs/schema.md`, `test/` fixtures, and relevant backend/frontend source references.
+  - Updated `CODEX.md` so current state reflects PR13 merged and PR14 as the next deployment/README step.
+  - Updated `agents.md` with `frontend/src/types/`, `problems.md`, Chinese editor mapping, and local review-state boundaries.
+  - Updated `README.md` with the schema-doc entry point, Chinese editor mapping, reading controls, scene marks, and YAML color marks.
+- Validation:
+  - Root rule files remain within size budget: `agents.md` and `CODEX.md` are below 300 lines.
+  - No relative-time wording found in reviewed markdown files.
+
 ### PR12 hand-test feedback: YAML color marking menu
 - **Status:** fixed
 - User reported:

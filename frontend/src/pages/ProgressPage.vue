@@ -33,7 +33,9 @@ const progressLabel = computed(() => {
     return "正在接收素材";
   }
   if (status.value.status === "completed") {
-    return status.value.error_message ? "初稿已完成，部分章节待处理" : "剧本初稿已完成";
+    return status.value.error_message
+      ? "初稿已完成，部分章节待处理"
+      : "剧本初稿已完成";
   }
   if (status.value.status === "failed") {
     return "转换没有完成";
@@ -99,11 +101,15 @@ const sourceLabel = computed(() => {
   if (status.value.input_name === "pasted-text.txt") {
     return "粘贴文本";
   }
-  return status.value.input_name?.toLowerCase().endsWith(".txt") ? "文本文件" : "粘贴文本";
+  return status.value.input_name?.toLowerCase().endsWith(".txt")
+    ? "文本文件"
+    : "粘贴文本";
 });
 
 const chapterRows = computed(() => status.value?.chapters ?? []);
-const canViewPartialResult = computed(() => Boolean(status.value?.can_view_result));
+const canViewPartialResult = computed(() =>
+  Boolean(status.value?.can_view_result),
+);
 
 const chapterSummary = computed(() => {
   if (!status.value) {
@@ -119,21 +125,31 @@ const chapterSummary = computed(() => {
 
 const sourceChapterCount = computed(() => {
   const baseTitles = new Set(
-    chapterRows.value.map((chapter) => chapter.title.replace(/（分块 \d+\/\d+）$/, ""))
+    chapterRows.value.map((chapter) =>
+      chapter.title.replace(/（分块 \d+\/\d+）$/, ""),
+    ),
   );
   return baseTitles.size;
 });
 
-const hasSplitChapters = computed(() => chapterRows.value.some((chapter) => /（分块 \d+\/\d+）$/.test(chapter.title)));
+const hasSplitChapters = computed(() =>
+  chapterRows.value.some((chapter) => /（分块 \d+\/\d+）$/.test(chapter.title)),
+);
 
 function chapterState(index: number) {
   if (!status.value || status.value.status === "failed") {
     return "waiting";
   }
-  if (status.value.status === "completed" || index <= status.value.chapters_done) {
+  if (
+    status.value.status === "completed" ||
+    index <= status.value.chapters_done
+  ) {
     return "done";
   }
-  if (status.value.status === "processing" && index === status.value.chapters_done + 1) {
+  if (
+    status.value.status === "processing" &&
+    index === status.value.chapters_done + 1
+  ) {
     return "active";
   }
   return "waiting";
@@ -177,7 +193,7 @@ onMounted(start);
           <dd>{{ chapterSummary }}</dd>
         </div>
         <div>
-          <dt>方式</dt>
+          <dt>模型</dt>
           <dd>{{ providerLabel }}</dd>
         </div>
       </dl>
@@ -192,8 +208,16 @@ onMounted(start);
       </p>
 
       <div class="progress-next-step">
-        <CheckCircle2 v-if="status?.status === 'completed'" :size="20" aria-hidden="true" />
-        <RotateCcw v-else-if="status?.status === 'failed'" :size="20" aria-hidden="true" />
+        <CheckCircle2
+          v-if="status?.status === 'completed'"
+          :size="20"
+          aria-hidden="true"
+        />
+        <RotateCcw
+          v-else-if="status?.status === 'failed'"
+          :size="20"
+          aria-hidden="true"
+        />
         <FileText v-else :size="20" aria-hidden="true" />
         <span>
           {{
@@ -252,8 +276,15 @@ onMounted(start);
           :data-state="chapterState(chapter.index)"
         >
           <div class="chapter-preview-marker" aria-hidden="true">
-            <CheckCircle2 v-if="chapterState(chapter.index) === 'done'" :size="17" />
-            <RefreshCw v-else-if="chapterState(chapter.index) === 'active'" :size="17" class="spin" />
+            <CheckCircle2
+              v-if="chapterState(chapter.index) === 'done'"
+              :size="17"
+            />
+            <RefreshCw
+              v-else-if="chapterState(chapter.index) === 'active'"
+              :size="17"
+              class="spin"
+            />
             <Circle v-else :size="17" />
           </div>
           <div>

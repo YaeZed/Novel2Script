@@ -23,7 +23,8 @@ demo/
 │   │   ├── components/      # 可复用组件
 │   │   ├── api/             # 后端 API 调用封装
 │   │   ├── schemas/         # zod schema 定义
-│   │   └── composables/     # Vue composables
+│   │   ├── composables/     # Vue composables
+│   │   └── types/           # 跨组件共享前端类型
 │   └── ...
 ├── backend/                 # Django 后端
 │   ├── converter/           # 核心转换 app
@@ -41,6 +42,7 @@ demo/
 ├── task_plan.md
 ├── findings.md
 ├── progress.md
+├── problems.md              # 已发现问题、根因和修复复盘
 └── agents.md                # 本文件
 ```
 
@@ -51,6 +53,8 @@ demo/
 Act (幕) → Scene (场) → Beat (节拍)
 ```
 Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选）、`content`、`parenthetical`（可选括号指示）
+
+后端/API 的剧本契约使用英文 key；对照页编辑区会把字段和节拍类型显示为中文，并在校验和解析前映射回内部字段。完整契约以 `docs/schema.md` 为准。阅读模式、场景标记、文本颜色标记只保存在浏览器本地，不进入剧本 YAML。
 
 ### 当前转换流程
 1. 接收粘贴文本或 TXT/EPUB 文件，创建 `ConversionTask`
@@ -71,7 +75,7 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 ### 后续目标流程
 1. 更完整的角色统一策略：别名合并、跨章称呼规范化
 2. 可编辑三幕边界：允许作者在对照页调整幕归属并保存
-3. Phase 6 阅读体验、Schema 文档收束和部署配置
+3. 部署配置与 README 最终收束
 
 ### 三幕边界约定
 
@@ -91,6 +95,12 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 - `/` — 上传页（三种输入方式）
 - `/progress/:taskId` — 进度页（轮询 + 逐章预览）
 - `/compare/:taskId` — 对照视图（按场对齐 + 内联编辑）
+
+### 对照页审阅状态
+- 支持浅色/深色护眼阅读和阅读密度调整。
+- 支持场景标记：未标记、待处理、已确认。
+- 支持剧本草稿文本颜色标记：红、橙、黄、绿、蓝。
+- 这些状态是本地审阅辅助，不写入后端结果，也不属于 `docs/schema.md` 的剧本 Schema。
 
 ## 开发约定
 

@@ -22,15 +22,35 @@ const isSubmitting = ref(false);
 const error = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
 
-const sampleText = `第一章 雨夜
-雨声落在旧戏院的玻璃棚顶上。
-林照：今晚不能再等了。
-沈岚抬头，看见后台门缝里漏出一线冷光。
+const sampleText = `第一章 灯灭
+海边小镇每晚九点都会亮起灯塔。林照发现今晚灯塔没有亮，码头的钟也停在九点零三分。
+林照：灯塔不该停。
+她在灯塔门口捡到一张旧船票，背面写着：别相信潮汐表。
 
-第二章 后台
-灯牌忽明忽暗，木地板发出轻响。
-沈岚：你听见了吗？
-林照没有回答，只把那封皱掉的信塞进口袋。`;
+第二章 失踪
+林照的哥哥林远去查灯塔记录，凌晨没有回来。
+沈岚：如果他真的进了灯塔，门禁册上应该有名字。
+林照翻到最后一页，只看到一行被墨水涂掉的签名。
+
+第三章 潮汐表
+林照和沈岚去档案馆，发现过去三个月的潮汐表都被人改过。
+旧管理员告诉她们，十年前有一艘货船在灯塔外沉没，但事故报告从未公开。
+沈岚：有人一直在让船靠错方向。
+
+第四章 封锁
+镇长派人封锁灯塔，说风暴来临前任何人不得靠近。
+林照偷偷进入控制室，听见无线电里传来林远的声音。
+林远：地下室，不要开主灯。
+
+第五章 风暴
+风暴夜，林照和沈岚进入灯塔地下室，发现林远被困在旧发电机旁。
+镇长赶到，承认当年的沉船不是事故，而是为了掩盖走私航线。
+林照启动备用灯，海面上的搜救船终于看见灯光。
+
+第六章 天亮
+清晨，灯塔恢复运转，镇长被带走。
+林远把那张旧船票交给林照，说真相不应该再锁在灯塔里。
+林照望着重新亮起的灯，决定留下来整理十年前的全部记录。`;
 
 const currentText = computed(() => {
   if (mode.value === "sample") {
@@ -148,8 +168,14 @@ async function submit() {
 
   try {
     const response = await createConversion({
-      text: mode.value === "sample" ? sampleText : mode.value === "text" ? text.value : undefined,
-      file: mode.value === "file" ? selectedFile.value ?? undefined : undefined,
+      text:
+        mode.value === "sample"
+          ? sampleText
+          : mode.value === "text"
+            ? text.value
+            : undefined,
+      file:
+        mode.value === "file" ? (selectedFile.value ?? undefined) : undefined,
     });
     await router.push(`/progress/${response.task_id}`);
   } catch (caught) {
@@ -172,7 +198,11 @@ function formatSubmitError(caught: unknown) {
 }
 
 function isResponseLikeError(caught: unknown): caught is ResponseLikeError {
-  return typeof caught === "object" && caught !== null && ("response" in caught || "message" in caught);
+  return (
+    typeof caught === "object" &&
+    caught !== null &&
+    ("response" in caught || "message" in caught)
+  );
 }
 
 function extractResponseMessage(data: unknown): string {
@@ -254,7 +284,11 @@ function extractResponseMessage(data: unknown): string {
         <div v-else-if="mode === 'file'" class="file-drop">
           <FileUp :size="30" aria-hidden="true" />
           <strong>{{ selectedFile?.name || "选择文本文件或电子书" }}</strong>
-          <span>{{ selectedFile ? formatFileSize(selectedFile.size) : "文件内容会用于生成剧本初稿" }}</span>
+          <span>{{
+            selectedFile
+              ? formatFileSize(selectedFile.size)
+              : "文件内容会用于生成剧本初稿"
+          }}</span>
           <AppButton variant="secondary" @click="openFilePicker">
             <FileUp :size="17" aria-hidden="true" />
             <span>{{ selectedFile ? "更换文件" : "选择文件" }}</span>
@@ -284,8 +318,17 @@ function extractResponseMessage(data: unknown): string {
         <span>{{ readinessLabel }}</span>
       </div>
 
-      <AppButton variant="primary" :disabled="!canSubmit || isSubmitting" @click="submit">
-        <Sparkles v-if="isSubmitting" :size="18" aria-hidden="true" class="spin" />
+      <AppButton
+        variant="primary"
+        :disabled="!canSubmit || isSubmitting"
+        @click="submit"
+      >
+        <Sparkles
+          v-if="isSubmitting"
+          :size="18"
+          aria-hidden="true"
+          class="spin"
+        />
         <ArrowRight v-else :size="18" aria-hidden="true" />
         <span>{{ isSubmitting ? "转换中" : "开始转换" }}</span>
       </AppButton>
