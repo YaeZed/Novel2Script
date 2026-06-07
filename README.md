@@ -29,22 +29,54 @@ npm run dev
 
 - 后端会先从全文本提取角色表，再逐章生成 Scene/Beat。
 - 角色提取依据包括行首对话说话人、引号对白归因、叙述动作线索，并过滤 `时间`、`地点`、`备注` 等元数据标签。
-- LLM prompt 已加入 grounding 约束：只基于当前章节原文生成，优先使用角色表中的名字，不凭空补主角、关系或跨章剧情。
-- 所有章节 Scene 生成后，后端会统一按全剧顺序编号，并按章节进展组装为 Act。少于 3 个 Scene 保持单幕；3 个及以上 Scene 拆为开端、展开、收束三幕。
+- LLM prompt 已加入 grounding 约束：只基于当前章节原文生成，优先使用角色表中的名字，不凭空补主角、关系或跨章剧情，并保持节拍顺序贴近原文。
+- 真实模型输出的节拍会再按章节原文锚点做稳定排序，避免后文对白提前到前文叙述之前。
+- 所有章节 Scene 生成后，后端会统一按全剧顺序编号。少于 3 个 Scene 保持单幕；3 个及以上 Scene 组装为开端、展开、收束三幕。
 
-## PR11.1 Act Boundary Behavior
+## 三幕边界行为
 
-- `LLM_PROVIDER=placeholder` continues to use the deterministic act split.
-- Real model providers run one final act-boundary pass after all scenes are generated. The model sees ordered scene numbers, source chapters, titles, summaries, and beat outlines, then proposes three contiguous scene ranges for opening, development, and resolution.
-- The backend validates that every scene is covered exactly once. Invalid output, planner errors, or unavailable model calls fall back to the deterministic split instead of failing the conversion.
-- While a long conversion is still processing, the partial draft is grouped under `已处理部分` instead of opening/development/resolution. Final act labels appear only after completion.
-- This PR does not add frontend act editing; the output remains the same screenplay file structure.
+- `LLM_PROVIDER=placeholder` 使用确定性三幕拆分，保证无 key 演示稳定。
+- 真实模型 provider 会在所有场景生成后额外执行一次三幕边界判断。模型只读取场景序号、来源章节、标题、摘要和节拍概览，然后建议开端、展开、收束的连续场景范围。
+- 后端只接受完整覆盖全部场景且没有重叠、空幕、缺口的建议；模型不可用或输出无效时回退到确定性拆分，不让转换失败。
+- 长文仍在处理时，partial 草稿统一放在 `已处理部分`，最终三幕标签只在任务完成后出现。
+- 当前还不支持在页面上手动调整并保存三幕边界。
 
 ## API
 
 - `POST /api/convert`：创建转换任务，返回 `{ task_id }`
-- `GET /api/status/<id>`：返回任务状态和进度
+- `GET /api/status/<id>`：返回任务状态、进度、素材预览和是否已有可查看草稿
 - `GET /api/result/<id>`：返回 YAML、角色表和章节信息
+
+## 依赖
+
+后端：
+
+- Django + Django REST Framework
+- django-cors-headers
+- python-dotenv
+- PyYAML + jsonschema
+- ebooklib
+- anthropic
+- openai
+
+前端：
+
+- Vue 3 + Vite + TypeScript
+- Vue Router
+- axios
+- js-yaml + zod
+- @lucide/vue
+
+## 原创功能
+
+- 粘贴、TXT、EPUB 三种输入入口。
+- 章节拆分、EPUB 正文抽取和非正文过滤。
+- 来源证据角色表，并将角色证据输入逐章转换。
+- 多厂商真实模型转换和无 key 的本地占位转换。
+- 章节级重试与“需人工处理”兜底场景。
+- 长文处理中查看已处理内容，并保护用户本地编辑不被自动覆盖。
+- 原文与剧本按场对照，支持格式检查和剧本文件下载。
+- 基于剧情事件的最终三幕边界规划，失败时回退确定性拆分。
 
 ## 当前能力
 

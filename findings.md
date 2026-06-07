@@ -67,7 +67,7 @@
 - 用户界面和用户可见错误提示不能直接暴露“前端、后端、API、provider、Schema、YAML、Act、Scene、Beat”等技术词。普通作者只需要知道当前页面、处理服务、剧本格式、处理方式和下一步动作。
 
 ### Current implementation findings
-- 当前分支已有草稿：`AppButton.vue`、`SectionHeader.vue`，以及进度页/对照页的局部组件替换。
+- PR9 开始前的工作树已有草稿：`AppButton.vue`、`SectionHeader.vue`，以及进度页/对照页的局部组件替换。
 - `ConvertView` 接受 `text` 或 `file`，EPUB 通过文件名后缀识别；非 EPUB 文件按 UTF-8 文本读取。
 - 前端 `createConversion` 使用 `FormData`，因此上传页只需要确保同一时间提交一种有效输入。
 - 当前上传页文案和布局过薄，缺少素材状态反馈；右侧 YAML 预览是静态装饰，应该改成更有任务感的结果摘要。
@@ -309,6 +309,14 @@
 - User found chapter 3 beats were not in source order: the model placed 沈岚's later line before the old administrator's earlier information.
 - Root cause: real model scene conversion may reorder beats for dramatic flow even when all content is grounded in the chapter text.
 - Fix: chapter prompts now require chronological beat order, and backend scene normalization stable-sorts LLM beats by source-text anchors so compare-page reading follows the original chapter order.
+
+## 2026-06-07 Post-PR11.1 Documentation Sync Findings
+
+- `CODEX.md` and `agents.md` must describe merged `master` behavior, not the temporary PR11/PR11.1 branch state.
+- Model-assisted act boundary planning is now current backend behavior for real providers, with deterministic fallback for `placeholder` or invalid planner output.
+- Partial drafts intentionally use `已处理部分`; opening/development/resolution labels are final-output-only.
+- `docs/schema.md` should describe the stable YAML contract and generation behavior, not accumulate PR-by-PR notes.
+- `README.md` must include dependency and original-feature lists because project rules require it for handoff and evaluation.
 
 ## 2026-06-06 PR10 Progress Page Findings
 

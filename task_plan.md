@@ -4,7 +4,7 @@
 构建一个 AI 辅助剧本创作工具，用户上传 3 章以上小说文本（txt/epub/粘贴），自动转换为结构化剧本（YAML 格式），并提供原文 vs 剧本并排对照视图，3 天内完成并部署上线。
 
 ## Current Phase
-Phase 5
+Phase 6
 
 ## PR 策略
 
@@ -24,6 +24,7 @@ Phase 5
 | PR10 | 前端进度页（轮询 + 逐章预览） | 2 commits | Phase 5 |
 | PR10.1 | 长文处理中查看已处理章节 + 对照页增量更新 | 1-2 commits | Phase 5 |
 | PR11 | 前端对照视图（按场对齐 + 内联编辑） | 2-3 commits | Phase 5 |
+| PR11.1 | 基于剧情事件的三幕边界规划 | 1 commit | Phase 5 |
 | PR12 | 深浅护眼模式 + 阅读体验打磨 | 1-2 commits | Phase 6 |
 | PR13 | 剧本 YAML Schema 文档 | 1 commit | Phase 6 |
 | PR14 | 部署配置 + README | 1 commit | Phase 6 |
@@ -64,6 +65,7 @@ Phase 5
 - [x] PR10: 进度页
 - [x] PR10.1: 长文处理中查看已处理章节 + 对照页增量更新
 - [x] PR11: 对照视图
+- [x] PR11.1: 基于剧情事件的三幕边界规划
 - **Status:** complete
 
 ### Phase 6: 打磨 + 部署 + 文档
@@ -419,3 +421,24 @@ Phase 5
   - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`
   - `node node_modules\vite\bin\vite.js build`
   - `git diff --check`
+
+## 2026-06-07 PR11.1 Completion
+
+- Delivered:
+  - Added backend model-assisted act boundary planning after all scenes are generated and normalized.
+  - Kept `placeholder` deterministic and added validation/fallback for invalid or unavailable model boundary output.
+  - Changed partial drafts to use a single `已处理部分` act so opening/development/resolution labels do not drift during long processing.
+  - Tightened character extraction and scene prompts so object labels like `背面写着` do not become characters.
+  - Added backend source-anchor ordering for real model beats so chapter dialogue/narration order follows the original text.
+  - Added `test/` manual fixture rules and the lighthouse PR11.1 hand-test sample.
+- Validation:
+  - `python -m compileall backend`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 46 tests.
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+- Merge:
+  - PR11.1 merged into `master` on 2026-06-07.
+  - Local and remote non-`master` branches were deleted after merge.
+  - Next PR: PR12 deep/light eye-care mode and reading experience.

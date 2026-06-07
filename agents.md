@@ -36,6 +36,7 @@ demo/
 │   └── ...
 ├── docs/
 │   └── schema.md            # 剧本 YAML Schema 文档
+├── test/                    # 人工验收样例
 ├── README.md
 ├── task_plan.md
 ├── findings.md
@@ -62,15 +63,17 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
    - `qwen`：阿里千问 DashScope OpenAI-compatible API
 5. 逐章转换为 Scene/Beat；真实模型输出失败会按配置重试
 6. 重试耗尽后生成“需人工处理”的 schema-valid Scene，认证/key/provider 配置错误仍直接失败
-7. 按全剧顺序重新编号 Scene，并按开端 / 展开 / 收束组装 Act
-8. 后端 schema 校验通过后保存 YAML、角色表、章节信息和必要的人工处理提示
+7. 每章完成后保存 partial 草稿，处理中统一放在 `已处理部分`，供用户提前进入对照页
+8. 最终按全剧顺序重新编号 Scene；`placeholder` 使用确定性三幕拆分，真实模型 provider 额外根据场景事件建议开端 / 展开 / 收束边界
+9. 后端校验三幕范围必须连续、非空、覆盖全部场景；非法或不可用时回退确定性拆分
+10. 后端 schema 校验通过后保存 YAML、角色表、章节信息和必要的人工处理提示
 
 ### 后续目标流程
 1. 更完整的角色统一策略：别名合并、跨章称呼规范化
-2. 更高级的 Act 大纲：在当前确定性三幕规则上引入可解释的模型级结构建议
-3. 前端 Phase 5 体验打磨：上传、进度反馈、对照编辑的完整验收
+2. 可编辑三幕边界：允许作者在对照页调整幕归属并保存
+3. Phase 6 阅读体验、Schema 文档收束和部署配置
 
-### PR11.1 Act Boundary Update
+### 三幕边界约定
 
 - 当前流程在所有 Scene 生成后，会先按全剧顺序重新编号。
 - `placeholder` 继续使用确定性三幕拆分。
@@ -81,7 +84,7 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 
 ### API 端点
 - `POST /api/convert` → `{task_id}`
-- `GET /api/status/<id>` → `{status, progress, chapters_done, total_chapters, error_message, llm_provider}`
+- `GET /api/status/<id>` → `{status, progress, chapters_done, total_chapters, chapters[], can_view_result, error_message, llm_provider}`
 - `GET /api/result/<id>` → `{script_yaml, characters, chapters[]}`
 
 ### 前端路由

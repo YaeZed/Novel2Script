@@ -540,3 +540,19 @@
   - `python -m compileall backend`: passed.
   - `python manage.py check`: passed.
   - `python manage.py test`: passed, 46 tests.
+
+## Session: 2026-06-07 Neat-Freak Sync After PR11.1
+
+### Documentation and memory cleanup
+- **Status:** complete
+- Actions taken:
+  - Confirmed local and remote branches only retain `master` after PR11.1 merge.
+  - Read root docs, `docs/schema.md`, `test/` fixtures, project rules, README, planning files, and relevant backend/frontend source files.
+  - Removed stale PR11/PR11.1 branch-specific rules from `CODEX.md` and rewrote the current-state section for merged `master`.
+  - Updated `agents.md` so model-assisted act boundaries, partial drafts, and `can_view_result` are current behavior rather than future work.
+  - Rewrote `docs/schema.md` from PR-note fragments into current Schema behavior.
+  - Updated `README.md` with current three-act behavior, dependencies, and original feature list.
+  - Added the PR11.1 hand-test issues to `problems.md`.
+  - Updated `task_plan.md` to Phase 6 and recorded PR11.1 completion/merge.
+- Validation:
+  - Stale branch/current-rule scan: cleaned root docs; remaining branch names only exist in historical progress/findings records.

@@ -1,19 +1,12 @@
 # CODEX Guide
 
-## PR11.1 Current Rule
+## 当前状态
 
-- Current branch: `codex-phase-5-pr11-1-act-boundaries`.
-- Scope: add backend model-assisted three-act boundary proposal based on generated story scenes.
-- The model may only propose act names and inclusive scene ranges. It must not rewrite scenes, beats, characters, or source references in this PR.
-- `placeholder` mode and invalid/unavailable model output must use the existing deterministic act split so no-key demos and long-running conversions remain reliable.
-- Frontend compare interaction, drag/drop boundary editing, save APIs, and scene generation prompts are out of scope.
-
-## Current Rule
-
-- 当前分支：`codex-phase-5-pr11-compare-view`，从 PR10.1 合并后的 `master` 开出。
-- Phase 4 已合并完成：章节/EPUB 处理、角色提取、prompt grounding、多章拼装、Act 划分、章节级 retry 和人工处理标记都已实现。
-- Phase 5 已完成 PR9 上传页、PR10 进度页、PR10.1 边处理边查看和 PR11 对照视图，下一步进入 PR12 阅读体验打磨。
-- PR11 已把对照页整理为按场景选择、原文依据、剧本草稿编辑、格式检查和下载的工作流。不要改 LLM provider、retry、Act 组装、后台 partial result 合同，也不要引入编辑保存接口或复杂合并器。
+- 当前保留分支：`master`。PR11.1 已合并，非 `master` 本地/远端分支已清理。
+- Phase 5 已完成：上传页、进度页、处理中查看已处理内容、对照视图、基于剧情事件的三幕边界规划。
+- 下一步进入 Phase 6：PR12 深浅/护眼模式与阅读体验、PR13 Schema 文档收束、PR14 部署与 README 完成。
+- 后端当前能力包括：章节/EPUB 处理、来源证据角色表、逐章 Scene/Beat 转换、章节级 retry、人工处理场景、partial 草稿、最终三幕边界规划。
+- 对照页当前能力包括：场景导航、原文依据、剧本草稿编辑、格式检查、下载，以及长文处理期间的增量载入保护。
 
 ## 项目定位
 
@@ -21,23 +14,17 @@ AI 小说转剧本工具。用户输入 3 章以上小说文本或 EPUB，系统
 
 ## 当前阶段
 
-Phase 5 已完成上传入口。当前端到端 demo 已具备：
+Phase 5 已完成，准备 Phase 6 打磨、文档和部署。当前端到端 demo 已具备：
 
 - 默认 `LLM_PROVIDER=placeholder`，无 API key 也能完成本地占位转换。
 - 显式配置 `anthropic` / `openai` / `qwen` 后，后端会调用对应模型把单章小说转换为 Scene/Beat。
 - 后端会先拆分章节/EPUB、提取来源证据角色表，再逐章转换。
-- 多章结果会按全剧顺序重新编号 Scene，并按开端、展开、收束组装为 Act。
+- 多章结果会按全剧顺序重新编号 Scene。`placeholder` 使用确定性三幕拆分；真实模型 provider 会在最终组装前根据场景事件建议开端、展开、收束的连续范围，非法建议回退到确定性拆分。
 - 真实模型单章失败会先按 `LLM_SCENE_MAX_ATTEMPTS` 重试；重试后仍失败时生成“需人工处理”的 Scene，任务仍可进入对照页。
-- 提交后会立即进入进度页；进度页按任务状态轮询，显示处理方式、章节进展和逐章预览。
-- 对照页 YAML 编辑已支持“草稿无效但保留最后一次有效结构”的校验体验，并能在长文处理时增量读取新章节。
-
-PR11 的前端边界：
-
-- 对照页按场景组织：左侧场景导航，中间原文依据，右侧剧本草稿，场景切换要同步原文和编辑位置。
-- 页面必须让作者先看到当前场景的摘要、来源、节拍数量和校验状态，不要求用户理解内部字段才能继续编辑。
-- 继续复用 `frontend/src/components/` 里的基础按钮、标题区和状态组件；只有出现真实重复时才抽新组件。
-- 样式对齐 PR9/PR10 的面板、进度条、按钮、焦点态和低饱和绿灰体系，移动端保持单列可读。
-- 用户可见文案继续遵守普通中文规则，避免直接暴露技术词。
+- 提交后会立即进入进度页；进度页按任务状态轮询，显示处理方式、素材进展、预览和“查看已处理”入口。
+- 对照页按场景组织：左侧场景导航，中间原文依据，右侧剧本草稿，场景切换同步原文和编辑位置。
+- 对照页剧本编辑支持“草稿无效但保留最后一次有效结构”，长文处理时只在用户没有本地编辑时自动载入新内容。
+- 真实模型输出的节拍会按原文章节锚点稳定重排，避免对照页出现后文对白提前到前文叙述之前。
 
 ## 目录约定
 
@@ -56,6 +43,7 @@ demo/
 │   ├── novel_script_converter/
 │   └── schema/               # Python JSON Schema validation
 ├── docs/                     # Product and schema docs
+├── test/                     # Manual hand-test fixtures and expected observations
 ├── task_plan.md
 ├── findings.md
 ├── progress.md
