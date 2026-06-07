@@ -63,8 +63,8 @@ Phase 5
 - [x] PR9: 上传页
 - [x] PR10: 进度页
 - [x] PR10.1: 长文处理中查看已处理章节 + 对照页增量更新
-- [ ] PR11: 对照视图
-- **Status:** in_progress
+- [x] PR11: 对照视图
+- **Status:** complete
 
 ### Phase 6: 打磨 + 部署 + 文档
 - [ ] PR12: 深浅模式 + 阅读体验
@@ -96,6 +96,8 @@ Phase 5
 | Error | Attempt | Resolution |
 |-------|---------|------------|
 | PR5 English heading test only returned 1 chapter | `python manage.py test` after first splitter patch | Replaced newline-consuming `\s*` heading regex whitespace with line-local whitespace so title matches cannot cross line boundaries |
+| PR11 Vite dev server failed with `spawn EPERM` | Normal sandbox start of `node node_modules\vite\bin\vite.js --host 127.0.0.1 --port 5173` | Started Vite with approved elevated permission and confirmed `http://127.0.0.1:5173/` returned 200 |
+| PR11 browser screenshot automation unavailable | Tried importing `playwright` in the local Node REPL | Module is not installed; used type check, production build, diff check, and local HTTP check for validation |
 
 ## Notes
 
@@ -185,6 +187,39 @@ Phase 5
   - 要解决的问题不是“多一个页面入口”，而是“长任务期间已经产生的价值不应该被锁在等待页里”。
   - 最直接路径是让 pipeline 按章节持久化 partial script，让 compare 页消费同一个 result/status 契约。
   - 从零设计会把转换产物视为可增长草稿：`processed scenes -> partial script -> editor`，新增内容只能在不破坏用户当前编辑上下文的前提下进入。
+
+## 2026-06-07 PR11 Execution Plan
+
+- Problem: 当前对照页能显示原文和剧本文件，但信息层级仍像技术调试页；作者缺少“这一场讲什么、来自哪里、要检查哪些节拍、格式是否可继续”的工作台反馈。
+- User impact: 作者进入对照页后应该直接按场检查，不需要在全文剧本文本里找位置；场景切换要同步原文依据和编辑区，格式问题要给出可行动提示。
+- Scope:
+  - 重构对照页布局层级：顶部处理状态保持轻量，主工作区聚焦场景导航、原文依据和剧本草稿。
+  - 抽取真实复用组件：场景导航列表、剧本格式提示/操作区，继续复用 `AppButton`、`SectionHeader`、`StatusPill`。
+  - 增加当前场景摘要、来源、节拍数量和角色提示，让作者先理解场景再编辑。
+  - 保留 PR10.1 增量更新规则：用户未编辑时自动载入，已有本地编辑时只提示手动载入。
+  - 不改后端 API、LLM provider、retry、Act 组装、保存接口或复杂合并逻辑。
+- First-principles framing:
+  - 要解决的问题不是“展示 YAML”，而是“让作者快速判断这一场是否忠于原文并能改成可用剧本”。
+  - 最直接路径是围绕 `select scene -> inspect source -> edit draft -> validate/download` 的闭环重排页面。
+  - 从零设计会把场景作为主导航单位，因为小说到剧本不是逐句映射；编辑区可以仍保留全文剧本文件，避免引入未设计好的局部保存语义。
+- Validation target:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`
+  - `node node_modules\vite\bin\vite.js build`
+  - `git diff --check`
+
+## 2026-06-07 PR11 Completion
+
+- Delivered:
+  - 新增 `SceneNavigator.vue`，把场景列表、刷新动作、来源和节拍摘要从页面模板中抽出。
+  - 新增 `ScriptValidationPanel.vue`，复用标题区和按钮，承接格式检查、下载动作和校验提示。
+  - 对照页主区重排为场景工作台：左侧选场，中间显示原文依据、场景摘要、来源、节拍数和角色，右侧保留完整剧本草稿编辑。
+  - 保留 PR10.1 的增量更新保护：本地有编辑时只提示载入新内容，不覆盖草稿。
+  - 样式对齐 PR9/PR10 的 8px 面板、按钮、焦点态、进度条和低饱和绿灰体系，并补移动端单列布局。
+- Validation:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+  - Local Vite server: `http://127.0.0.1:5173/` returned 200 after elevated start.
 
 ## 2026-06-06 PR7 Execution Plan
 

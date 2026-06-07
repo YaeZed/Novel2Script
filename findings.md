@@ -162,6 +162,18 @@
 *Update this file after every 2 view/browser/search operations*
 *This prevents visual information from being lost*
 
+## 2026-06-07 PR11 Compare View Findings
+
+### First-principles framing
+- 对照页的本质是作者校对工作台，不是结果文件查看器。核心任务链路是：选中一场、读原文依据、理解剧本节拍、修改草稿、确认格式可继续。
+- 场景是最稳定的对齐单位；逐句对齐会制造虚假的精确感，也会让小说改编场景的合并/删减变得难解释。
+- 右侧编辑区继续编辑完整剧本文件，而不是只编辑当前场景。原因是当前没有保存接口和局部合并语义，全文编辑能保持下载结果完整，场景跳转只负责定位。
+
+### Scope decisions
+- PR11 聚焦前端对照页体验，不改后端 API，也不引入保存、差异合并或多人协作。
+- 可抽组件的真实重复点是“场景导航”和“格式提示/操作区”；页面级轮询、YAML 定位和增量更新仍留在 `ComparePage.vue`，避免把业务流程藏进通用组件。
+- 样式继续沿用 PR9/PR10 的 8px 面板、低饱和绿灰、共享按钮和标题区；对照页要更像工作台，减少大段说明文字。
+
 ## 2026-06-06 PR10.1 Incremental Compare Findings
 
 ### First-principles framing

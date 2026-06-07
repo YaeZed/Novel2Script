@@ -486,3 +486,26 @@
   - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
   - `node node_modules\vite\bin\vite.js build`: passed.
   - `git diff --check`: passed; only CRLF normalization warnings.
+
+## Session: 2026-06-07 Phase 5 PR11 Execution
+
+### PR11: compare view
+- **Status:** complete
+- Actions taken:
+  - Read `planning-with-files` instructions and restored `task_plan.md`, `findings.md`, `progress.md`.
+  - Ran session catchup; it only surfaced old initialization context and did not affect PR11.
+  - Created branch `codex-phase-5-pr11-compare-view` from local `master`; normal branch creation hit `.git/refs` permission and succeeded with approved elevated Git permission.
+  - Inspected `CODEX.md`, PR11 plan context, `ComparePage.vue`, shared components, API types, script schema, progress page patterns, and global styles.
+  - Recorded PR11 first-principles scope in `CODEX.md`, `task_plan.md`, and `findings.md`.
+  - Added reusable `SceneNavigator.vue` and `ScriptValidationPanel.vue`.
+  - Reworked the compare page into a scene workflow: scene list, source evidence, scene summary/facts, full draft editor, validation actions, and download guard.
+  - Updated compare-page styles for wider scene navigation, denser scene metadata, source reading frame, scene facts, and responsive single-column behavior.
+- Current scope:
+  - Improve compare-page scene workflow, visual hierarchy, inline editing feedback, and component reuse.
+  - Preserve PR10.1 incremental update behavior and the current backend API contract.
+- Final validation:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+  - Vite dev server available at `http://127.0.0.1:5173/` after elevated start; normal sandbox start failed with `spawn EPERM` from esbuild.
+  - Browser screenshot automation was not available because `playwright` is not installed in the local Node REPL.
