@@ -23,12 +23,13 @@ def run_conversion_task(task: ConversionTask) -> None:
 
     chapters = split_chapters(task.source_text)
     chapter_payloads = [chapter_to_payload(chapter) for chapter in chapters]
+    characters = extract_character_table(task.source_text)
     task.total_chapters = len(chapters)
     task.chapters = chapter_payloads
+    task.characters = characters
     task.progress = 25
-    task.save(update_fields=["total_chapters", "chapters", "progress", "updated_at"])
+    task.save(update_fields=["total_chapters", "chapters", "characters", "progress", "updated_at"])
 
-    characters = extract_character_table(task.source_text)
     scene_converter = build_scene_converter()
     scenes = []
     manual_review_labels = []
@@ -40,7 +41,7 @@ def run_conversion_task(task: ConversionTask) -> None:
             manual_review_labels.append(conversion.manual_review_label)
         task.chapters_done = len(scenes)
         task.progress = conversion_progress(len(scenes), len(chapters))
-        task.save(update_fields=["chapters_done", "progress", "updated_at"])
+        persist_partial_script(task, characters, scenes)
 
     script = assemble_script(
         title=task.input_name or "Untitled",
@@ -68,6 +69,27 @@ def run_conversion_task(task: ConversionTask) -> None:
             "updated_at",
         ]
     )
+
+
+def persist_partial_script(
+    task: ConversionTask,
+    characters: list[dict[str, str]],
+    scenes: list[dict[str, object]],
+) -> None:
+    if not scenes:
+        task.save(update_fields=["chapters_done", "progress", "updated_at"])
+        return
+
+    script = assemble_script(
+        title=task.input_name or "Untitled",
+        characters=characters,
+        scenes=scenes,
+    )
+    validate_script(script)
+
+    task.characters = characters
+    task.script_yaml = dump_script_yaml(script)
+    task.save(update_fields=["characters", "script_yaml", "chapters_done", "progress", "updated_at"])
 
 
 class PlaceholderSceneConverter:
