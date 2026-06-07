@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { CheckCircle2, Download, RefreshCw } from "@lucide/vue";
+import { RefreshCw } from "@lucide/vue";
 import { YAMLException, load } from "js-yaml";
 import { ZodError, type ZodIssue } from "zod";
 
 import { getResult, getStatus, type ResultResponse, type StatusResponse } from "../api/client";
 import AppButton from "../components/AppButton.vue";
+import SceneNavigator from "../components/SceneNavigator.vue";
+import ScriptValidationPanel from "../components/ScriptValidationPanel.vue";
 import SectionHeader from "../components/SectionHeader.vue";
 import StatusPill from "../components/StatusPill.vue";
 import { scriptSchema, type ScriptDocument } from "../schemas/script";
@@ -13,6 +15,8 @@ import { scriptSchema, type ScriptDocument } from "../schemas/script";
 const props = defineProps<{
   taskId: string;
 }>();
+
+type Scene = ScriptDocument["acts"][number]["scenes"][number];
 
 const result = ref<ResultResponse | null>(null);
 const status = ref<StatusResponse | null>(null);
@@ -41,7 +45,7 @@ const progressTitle = computed(() => {
     return "正在读取处理进度";
   }
   if (status.value.status === "completed") {
-    return status.value.error_message ? "初稿已完成，部分章节待处理" : "剧本初稿已完成";
+    return status.value.error_message ? "初稿已完成，部分内容待处理" : "剧本初稿已完成";
   }
   if (status.value.status === "failed") {
     return "处理没有完成";
@@ -49,18 +53,18 @@ const progressTitle = computed(() => {
   if (!status.value.total_chapters) {
     return "正在整理素材";
   }
-  return `已处理 ${status.value.chapters_done}/${status.value.total_chapters} 章`;
+  return `已处理 ${status.value.chapters_done}/${status.value.total_chapters} 段`;
 });
 
 const progressDescription = computed(() => {
   if (hasPendingServerUpdate.value) {
-    return "后续章节已有新内容。你正在编辑当前草稿，页面不会自动覆盖。";
+    return "后续内容已有更新。你正在编辑当前草稿，页面不会自动覆盖。";
   }
   if (!status.value) {
     return "页面会在后台读取最新进度。";
   }
   if (status.value.status === "processing") {
-    return "可以先检查已完成内容，后续章节处理好后会自动补进来。";
+    return "可以先检查已完成内容，后续处理好后会自动补进来。";
   }
   if (status.value.status === "completed") {
     return "所有已生成内容都已载入，可以继续对照和编辑。";
@@ -87,12 +91,82 @@ const validationTitle = computed(() => {
   return "待校验";
 });
 
-const scenes = computed(() => lastValidScript.value?.acts.flatMap((act) => act.scenes) ?? []);
-const currentScene = computed(() => scenes.value[activeScene.value]);
+const sceneEntries = computed(() => (
+  lastValidScript.value?.acts.flatMap((act) => (
+    act.scenes.map((scene) => ({
+      actTitle: act.title,
+      scene,
+    }))
+  )) ?? []
+));
+
+const scenes = computed(() => sceneEntries.value.map((entry) => entry.scene));
+const currentSceneEntry = computed(() => sceneEntries.value[activeScene.value]);
+const currentScene = computed(() => currentSceneEntry.value?.scene);
 const currentChapter = computed(() => {
   const chapterIndex = currentScene.value?.source_chapter;
   return result.value?.chapters.find((chapter) => chapter.index === chapterIndex);
 });
+
+const sceneItems = computed(() => (
+  sceneEntries.value.map((entry, index) => ({
+    id: sceneStorageKey(index),
+    number: entry.scene.number,
+    title: entry.scene.title,
+    sourceTitle: chapterTitleForScene(entry.scene),
+    beatCount: entry.scene.beats.length,
+    summary: entry.scene.summary,
+  }))
+));
+
+const currentSceneSummary = computed(() => (
+  currentScene.value?.summary || "这一场还没有摘要，可以先对照原文检查节拍是否完整。"
+));
+
+const currentSceneCharacters = computed(() => {
+  const names = sceneCharacterNames(currentScene.value);
+  return names.length ? names.join("、") : "旁白/动作";
+});
+
+const currentSceneFacts = computed(() => {
+  if (!currentScene.value) {
+    return [];
+  }
+  return [
+    { label: "场次", value: `第 ${currentScene.value.number} 场` },
+    { label: "来源", value: chapterTitleForScene(currentScene.value) },
+    { label: "结构", value: `${currentScene.value.beats.length} 个节拍` },
+    { label: "角色", value: currentSceneCharacters.value },
+  ];
+});
+
+const currentSceneTitle = computed(() => {
+  if (!currentScene.value) {
+    return "未选择场景";
+  }
+  const actTitle = currentSceneEntry.value?.actTitle;
+  return actTitle ? `${actTitle} · ${currentScene.value.title}` : currentScene.value.title;
+});
+
+const canDownload = computed(() => Boolean(yamlText.value.trim()));
+
+function chapterTitleForScene(scene: Scene) {
+  return result.value?.chapters.find((chapter) => chapter.index === scene.source_chapter)?.title
+    || `素材 ${scene.source_chapter}`;
+}
+
+function sceneCharacterNames(scene: Scene | undefined) {
+  if (!scene) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      scene.beats
+        .map((beat) => beat.character?.trim())
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ).slice(0, 4);
+}
 
 async function refreshCompareState() {
   try {
@@ -246,6 +320,9 @@ function humanizePath(path: Array<string | number>) {
 }
 
 function downloadYaml() {
+  if (!yamlText.value.trim()) {
+    return;
+  }
   const blob = new Blob([yamlText.value], { type: "text/yaml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -476,7 +553,7 @@ onBeforeUnmount(stopPolling);
         <strong>{{ progressValue }}%</strong>
       </div>
       <div v-if="hasPendingServerUpdate" class="compare-update-row">
-        <span>新处理好的章节还没有载入。</span>
+        <span>新处理好的内容还没有载入。</span>
         <AppButton variant="secondary" @click="applyPendingResult">
           <RefreshCw :size="17" aria-hidden="true" />
           <span>载入新内容</span>
@@ -485,51 +562,52 @@ onBeforeUnmount(stopPolling);
     </div>
 
     <section class="compare-layout">
-      <aside class="panel scene-rail">
-        <SectionHeader eyebrow="场景">
-          <AppButton variant="icon" aria-label="刷新结果" @click="refreshCompareState">
-            <RefreshCw :size="17" aria-hidden="true" />
-          </AppButton>
-        </SectionHeader>
-        <button
-          v-for="(scene, index) in scenes"
-          :key="`${scene.source_chapter}-${scene.number}`"
-          class="scene-button"
-          :class="{ active: activeScene === index }"
-          type="button"
-          @click="selectScene(index)"
-        >
-          <span>{{ scene.number }}</span>
-          <strong>{{ scene.title }}</strong>
-        </button>
-      </aside>
+      <SceneNavigator
+        :scenes="sceneItems"
+        :active-index="activeScene"
+        @refresh="refreshCompareState"
+        @select="selectScene"
+      />
 
       <div class="compare-main">
         <div class="panel compare-pane">
-          <SectionHeader eyebrow="原文" :title="currentChapter?.title || '未选择场景'" />
-          <article ref="sourceTextPane" class="source-text" @scroll="rememberActiveSourceScroll">{{ currentChapter?.text }}</article>
+          <SectionHeader
+            eyebrow="原文依据"
+            :title="currentSceneTitle"
+            :description="currentChapter?.title ? `来源：${currentChapter.title}` : '选择场景后显示原文依据。'"
+          />
+
+          <div v-if="currentScene" class="scene-context">
+            <p class="scene-summary">{{ currentSceneSummary }}</p>
+            <dl class="scene-facts">
+              <div v-for="fact in currentSceneFacts" :key="fact.label">
+                <dt>{{ fact.label }}</dt>
+                <dd>{{ fact.value }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <article ref="sourceTextPane" class="source-text" @scroll="rememberActiveSourceScroll">
+            <template v-if="currentChapter?.text">{{ currentChapter.text }}</template>
+            <span v-else class="empty-source">原文载入后会显示在这里。</span>
+          </article>
         </div>
 
         <div class="panel compare-pane">
-          <SectionHeader eyebrow="剧本" :title="validationTitle">
-            <AppButton variant="icon" aria-label="检查剧本格式" @click="validateYaml">
-              <CheckCircle2 :size="17" aria-hidden="true" />
-            </AppButton>
-            <AppButton variant="icon" aria-label="下载剧本文件" @click="downloadYaml">
-              <Download :size="17" aria-hidden="true" />
-            </AppButton>
-          </SectionHeader>
-          <p
-            v-if="validationDetail"
-            class="validation-note"
-            :data-status="validationStatus"
-          >
-            {{ validationDetail }}
-          </p>
+          <ScriptValidationPanel
+            :title="validationTitle"
+            :detail="validationDetail"
+            :status="validationStatus"
+            :can-download="canDownload"
+            @validate="validateYaml"
+            @download="downloadYaml"
+          />
           <textarea
             ref="yamlEditor"
             v-model="yamlText"
             class="yaml-editor"
+            aria-label="剧本草稿编辑区"
+            placeholder="处理好的剧本文件会显示在这里。"
             spellcheck="false"
             @input="markDirty"
             @blur="validateYaml"
