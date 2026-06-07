@@ -70,7 +70,7 @@ Phase 6
 
 ### Phase 6: 打磨 + 部署 + 文档
 - [x] PR12: 深浅模式 + 阅读体验
-- [ ] PR13: Schema 文档
+- [x] PR13: Schema 文档
 - [ ] PR14: 部署 + README
 - **Status:** in progress
 
@@ -102,6 +102,37 @@ Phase 6
 | PR11 browser screenshot automation unavailable | Tried importing `playwright` in the local Node REPL | Module is not installed; used type check, production build, diff check, and local HTTP check for validation |
 
 ## Notes
+
+## 2026-06-07 PR13 Execution Plan
+
+- Problem: The current schema doc describes the backend YAML contract, but PR12 changed the compare-page editing surface to display Chinese labels and local review annotations. Without a clearer contract doc, future edits may confuse exported script content with review workspace state.
+- User impact: Authors and evaluators should understand which fields belong to the downloadable script, why the editor can show Chinese labels, and why color marks / scene marks are not part of the script file.
+- Scope:
+  - Rewrite `docs/schema.md` into the authoritative current YAML contract.
+  - Document required fields, optional fields, allowed beat types, numbering rules, and `source_chapter` alignment.
+  - Document backend English-key storage/export versus compare-page Chinese display mapping.
+  - Document generation behavior: placeholder, real providers, retry/manual-review fallback, partial drafts, final act boundaries.
+  - Keep backend schema, frontend validation behavior, APIs, and UI implementation unchanged unless a real doc/code mismatch is found.
+- First-principles framing:
+  - The product problem is not "make the doc longer"; it is "make the script file contract stable enough for generation, editing, validation, and download."
+  - The direct path is to ground the doc in `backend/schema/script_schema.py`, `frontend/src/schemas/script.ts`, and compare-page localization behavior.
+  - From zero, there are two layers: exported script content and reviewer workspace metadata. PR13 should make that boundary explicit.
+- Validation target:
+  - Source-backed doc review against backend and frontend schema definitions.
+  - `git diff --check`
+  - Frontend type/build only if docs reference or reveal a code mismatch.
+
+## 2026-06-07 PR13 Completion
+
+- Delivered:
+  - Rewrote `docs/schema.md` as the authoritative script YAML contract.
+  - Documented backend/API English-key YAML versus compare-page Chinese editing labels.
+  - Documented required/optional fields, allowed beat types, numbering, `source_chapter`, partial drafts, three-act assembly, manual-review scenes, and local review metadata boundaries.
+  - Synced `CODEX.md` current-state notes with PR12 reading/marking capabilities and PR13 status.
+- Validation:
+  - Source-backed review against `backend/schema/script_schema.py`, `frontend/src/schemas/script.ts`, `ComparePage.vue`, `script_assembler.py`, and `conversion_recovery.py`.
+  - Chinese display mapping check: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
 
 ## 2026-06-07 PR12 Execution Plan
 
