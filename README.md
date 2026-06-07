@@ -2,6 +2,12 @@
 
 把小说文本转换为结构化剧本 YAML，并提供原文与剧本的并排对照编辑。当前版本面向 demo 和毕业设计验收：默认不调用外部模型，配置服务端密钥后可切换 Anthropic、OpenAI 或阿里千问。
 
+在线体验：https://novel2-script.vercel.app/
+
+演示视频：https://www.bilibili.com/video/BV1TLEt6rEfY/?spm_id_from=333.1387.homepage.video_card.click&vd_source=f17390a213467539959476705fa98c93
+
+Schema.md文档：[`docs/schema.md`](docs/schema.md)
+
 ## 功能范围
 
 - 输入：粘贴文本、TXT 文件、EPUB 文件。
