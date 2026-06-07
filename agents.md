@@ -38,6 +38,7 @@ demo/
 ├── docs/
 │   └── schema.md            # 剧本 YAML Schema 文档
 ├── test/                    # 人工验收样例
+├── render.yaml              # Render Blueprint：后端服务 + PostgreSQL
 ├── README.md
 ├── task_plan.md
 ├── findings.md
@@ -75,7 +76,7 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 ### 后续目标流程
 1. 更完整的角色统一策略：别名合并、跨章称呼规范化
 2. 可编辑三幕边界：允许作者在对照页调整幕归属并保存
-3. 部署配置与 README 最终收束
+3. 高并发生产化：把当前 Web 进程后台线程替换为队列和独立 worker
 
 ### 三幕边界约定
 
@@ -90,6 +91,14 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 - `POST /api/convert` → `{task_id}`
 - `GET /api/status/<id>` → `{status, progress, chapters_done, total_chapters, chapters[], can_view_result, error_message, llm_provider}`
 - `GET /api/result/<id>` → `{script_yaml, characters, chapters[]}`
+- `GET /healthz` → Render/Vercel 部署健康检查
+
+### 部署约定
+- 前端部署在 Vercel，Root Directory 为 `frontend`，`VITE_API_BASE_URL` 指向 Render 后端公开地址。
+- 后端部署在 Render，`render.yaml` 创建 Django Web Service 和 PostgreSQL，`backend/build.sh` 执行依赖安装、静态文件收集和数据库迁移。
+- 本地默认 SQLite；线上设置 `DATABASE_URL` 后自动切换 PostgreSQL。
+- 后端密钥、LLM key 和模型切换只放部署环境变量，不进入前端。
+- Vercel 深链接由 `frontend/vercel.json` rewrite 到 `index.html`。
 
 ### 前端路由
 - `/` — 上传页（三种输入方式）
@@ -122,6 +131,8 @@ Beat 包含字段：`type`（dialogue/action/direction）、`character`（可选
 - ebooklib (EPUB 解析)
 - django-cors-headers (CORS)
 - python-dotenv (环境变量)
+- dj-database-url + psycopg2-binary (Render PostgreSQL)
+- gunicorn + WhiteNoise (生产启动与静态文件)
 - PyYAML + jsonschema (YAML 校验)
 
 ### 前端 (Node.js)

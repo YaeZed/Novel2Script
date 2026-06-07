@@ -1,0 +1,34 @@
+databases:
+  - name: novel-to-script-db
+    plan: free
+    databaseName: novel_to_script
+    user: novel_to_script
+
+services:
+  - type: web
+    name: novel-to-script-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: bash ./build.sh
+    startCommand: python -m gunicorn novel_script_converter.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 180
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: novel-to-script-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: SECURE_SSL_REDIRECT
+        value: true
+      - key: SECURE_HSTS_SECONDS
+        value: 3600
+      - key: LLM_PROVIDER
+        value: placeholder
+      - key: LLM_MAX_TOKENS
+        value: 3000
+      - key: LLM_SCENE_MAX_ATTEMPTS
+        value: 2

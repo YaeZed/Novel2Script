@@ -71,8 +71,8 @@ Phase 6
 ### Phase 6: 打磨 + 部署 + 文档
 - [x] PR12: 深浅模式 + 阅读体验
 - [x] PR13: Schema 文档
-- [ ] PR14: 部署 + README
-- **Status:** in progress
+- [x] PR14: 部署 + README
+- **Status:** complete
 
 ## Key Questions
 1. 多厂商 LLM 单次输出完整 Scene YAML 的稳定性能否保证？→ 通过 provider 抽象 + 分块 + 重试兜底
@@ -102,6 +102,47 @@ Phase 6
 | PR11 browser screenshot automation unavailable | Tried importing `playwright` in the local Node REPL | Module is not installed; used type check, production build, diff check, and local HTTP check for validation |
 
 ## Notes
+
+## 2026-06-07 PR14 Execution Plan
+
+- Problem: The app is feature-complete for the demo flow, but deployment is still implicit. Django settings assume local hosts/SQLite/static handling, Vercel needs an SPA rewrite, and README does not yet give a complete Vercel + Render handoff path.
+- User impact: A reviewer or teammate should be able to deploy the frontend and backend without reading source code, refresh deep links without 404s, and know exactly which environment variables control model usage.
+- Scope:
+  - Add production-ready Django environment switches for allowed hosts, CORS, CSRF, static files, and optional `DATABASE_URL`.
+  - Add deployment dependencies and Render start/build configuration.
+  - Add Vercel SPA configuration for the frontend.
+  - Rewrite README around local run, deploy runbook, environment variables, dependency list, and original feature list.
+  - Keep conversion behavior, APIs, UI flows, schema, and provider prompts unchanged.
+- First-principles framing:
+  - The product problem is not "add hosting files"; it is "make the demo reproducible outside this machine."
+  - The direct path is environment-driven configuration: local defaults stay frictionless, deployment platforms inject public hostnames, database URL, and server-side model keys.
+  - From zero, the deployment boundary is `browser -> Vercel static SPA -> Render Django API -> optional LLM provider`; user-facing screens should not expose secrets or hosting internals.
+- Validation target:
+  - `python -m compileall backend`
+  - `python manage.py check`
+  - `python manage.py test`
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`
+  - `node node_modules\vite\bin\vite.js build`
+  - `git diff --check`
+
+## 2026-06-07 PR14 Completion
+
+- Delivered:
+  - Added Render Blueprint for the Django API and PostgreSQL.
+  - Added Render build script for dependency installation, static collection, and migrations.
+  - Added Vercel SPA rewrite configuration for frontend deep links.
+  - Added production-ready Django settings for host allow-list, CORS, CSRF trusted origins, optional `DATABASE_URL`, WhiteNoise static files, HTTPS redirect, and `/healthz`.
+  - Rewrote README as local setup + deployment runbook with environment variables, dependency list, verification steps, API summary, and current limitations.
+  - Synced `CODEX.md`, `agents.md`, `findings.md`, and `progress.md`.
+- Validation:
+  - `python -m pip install -r requirements.txt`: passed.
+  - `python -m compileall .`: passed.
+  - `python manage.py check`: passed.
+  - `python manage.py test`: passed, 48 tests.
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+  - Production-style `python manage.py check --deploy`: passed with expected HSTS includeSubdomains/preload warnings intentionally not enabled for shared Render/Vercel domains.
 
 ## 2026-06-07 PR13 Execution Plan
 

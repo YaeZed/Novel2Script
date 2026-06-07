@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-- 当前保留分支：`master`。PR13 已合并，当前进入 PR14 部署配置与 README 收束。
+- 当前工作分支：`codex-phase-6-pr14-deploy-readme`。PR14 正在补齐 Render + Vercel 部署配置与 README。
 - Phase 5 已完成：上传页、进度页、处理中查看已处理内容、对照视图、基于剧情事件的三幕边界规划。
-- Phase 6 已完成 PR12 阅读体验和 PR13 Schema 文档；后续 PR14 完成部署配置与 README。
+- Phase 6 已完成 PR12 阅读体验和 PR13 Schema 文档；当前 PR14 完成部署配置与 README。
 - 后端当前能力包括：章节/EPUB 处理、来源证据角色表、逐章 Scene/Beat 转换、章节级 retry、人工处理场景、partial 草稿、最终三幕边界规划。
 - 对照页当前能力包括：场景导航、原文依据、剧本草稿编辑、格式检查、下载、阅读模式、场景标记、文本颜色标记，以及长文处理期间的增量载入保护。
 
@@ -27,6 +27,7 @@ Phase 6 正在收束部署准备。当前端到端 demo 已具备：
 - 对照页支持浅色/深色护眼阅读、阅读密度调整、场景标记和文本颜色标记；这些审阅状态保存在本地浏览器，不进入后端剧本 Schema。
 - 对照页编辑区会把剧本字段显示为中文标签，校验和解析前映射回后端标准字段；标准契约见 `docs/schema.md`。
 - 真实模型输出的节拍会按原文章节锚点稳定重排，避免对照页出现后文对白提前到前文叙述之前。
+- 部署目标为 Vercel 前端 + Render Django 后端 + Render PostgreSQL；后端通过环境变量切换本地 SQLite / 线上 `DATABASE_URL`，并提供 `/healthz` 健康检查。
 
 ## 目录约定
 
@@ -44,7 +45,10 @@ demo/
 │   ├── converter/            # Conversion task app
 │   │   └── services/         # Pipeline, chapter splitting, EPUB parsing
 │   ├── novel_script_converter/
-│   └── schema/               # Python JSON Schema validation
+│   ├── schema/               # Python JSON Schema validation
+│   ├── build.sh              # Render build script
+│   └── requirements.txt
+├── render.yaml               # Render Blueprint for API + PostgreSQL
 ├── docs/                     # Product and schema docs
 ├── test/                     # Manual hand-test fixtures and expected observations
 ├── task_plan.md
@@ -97,6 +101,12 @@ npm run build
 ```text
 DJANGO_SECRET_KEY=change-me
 DEBUG=true
+DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
+CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+CSRF_TRUSTED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+DATABASE_URL=
+SECURE_SSL_REDIRECT=false
+SECURE_HSTS_SECONDS=0
 LLM_PROVIDER=placeholder
 LLM_MAX_TOKENS=3000
 LLM_SCENE_MAX_ATTEMPTS=2
@@ -149,3 +159,4 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 | Django 模型存任务结果 | 免费层部署简单，避免先引入队列 | 初版可靠但长文本会等待 |
 | Scene 级对照 | 小说和剧本不是逐句映射 | 对照更自然，编辑成本更低 |
 | Schema 双端校验 | 后端保证输出结构，前端保护编辑体验 | 错误能早发现并定位 |
+| Vercel + Render 部署 | 前端静态托管、后端服务和数据库边界清晰，免费层足够 demo | 评审能通过公开 URL 复现，不需要本机环境 |
