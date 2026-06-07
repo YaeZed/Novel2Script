@@ -69,10 +69,10 @@ Phase 6
 - **Status:** complete
 
 ### Phase 6: 打磨 + 部署 + 文档
-- [ ] PR12: 深浅模式 + 阅读体验
+- [x] PR12: 深浅模式 + 阅读体验
 - [ ] PR13: Schema 文档
 - [ ] PR14: 部署 + README
-- **Status:** pending
+- **Status:** in progress
 
 ## Key Questions
 1. 多厂商 LLM 单次输出完整 Scene YAML 的稳定性能否保证？→ 通过 provider 抽象 + 分块 + 重试兜底
@@ -102,6 +102,58 @@ Phase 6
 | PR11 browser screenshot automation unavailable | Tried importing `playwright` in the local Node REPL | Module is not installed; used type check, production build, diff check, and local HTTP check for validation |
 
 ## Notes
+
+## 2026-06-07 PR12 Execution Plan
+
+- Problem: The compare page is now functionally usable, but long-form review still forces authors to read in one fixed visual mode and gives them no lightweight way to mark scenes while checking the draft.
+- User impact: Authors need to read for long sessions, switch between light/dark eye-care modes, tune reading density, and mark scenes that need follow-up without leaving the compare workflow.
+- Scope:
+  - Add reusable compare-page controls for reading appearance and scene marks.
+  - Persist reading preference and scene marks locally per task/browser.
+  - Show marked state in the scene navigator and current scene context.
+  - Improve source/draft reading layout and responsive spacing while staying aligned with existing `panel`, `SectionHeader`, `AppButton`, and scene navigation styles.
+  - Keep backend conversion, result API, YAML schema, act boundaries, and draft saving out of this PR.
+- First-principles framing:
+  - The product problem is not "add a theme switch"; it is "reduce review fatigue and help authors remember what to revisit."
+  - The direct path is local UI state because marks are reviewer workspace metadata, not script content yet.
+  - From zero, the compare page should separate document content from review workspace state: generated YAML remains unchanged, reading/marking state is local and reversible.
+- Component reuse plan:
+  - Reuse `AppButton` and `SectionHeader` for all controls.
+  - Add small reusable components instead of embedding control markup directly in `ComparePage.vue`.
+  - Extend `SceneNavigator` props to render mark status rather than duplicating a second scene list.
+- Validation target:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`
+  - `node node_modules\vite\bin\vite.js build`
+  - `git diff --check`
+
+## 2026-06-07 PR12 Completion
+
+- Delivered:
+  - Added reusable `ReadingControls` for light/dark eye-care mode and reading size controls.
+  - Added reusable `SceneMarkControls` for current-scene review marks.
+  - Extended `SceneNavigator` to show per-scene `待处理` / `已确认` badges.
+  - Added local persistence for reading preferences and per-task scene marks.
+  - Scoped reading colors, source text sizing, draft editor sizing, and dark-mode styling to the compare page.
+  - Added `frontend/src/types/` directory convention and shared `SceneMark` type.
+- Validation:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+## 2026-06-07 PR12 Follow-up: YAML Color Marks
+
+- Problem: Scene-level marks are useful, but authors also need WPS-like inline color marking inside the draft editor while comparing source and generated script.
+- User impact: Authors can select suspicious lines or phrases directly in the YAML draft and mark them red / orange / yellow / green / blue for later cleanup without changing the script text.
+- Scope:
+  - Replace the raw YAML textarea UI with a reusable highlight-capable editor wrapper while keeping the underlying text value unchanged.
+  - Show a floating five-color menu after selecting text in the YAML draft.
+  - Persist color highlights locally per task.
+  - Rebase or drop marks conservatively when the YAML text changes so stale highlights do not point at the wrong content.
+  - Keep backend APIs, YAML schema, download content, and validation behavior unchanged.
+- First-principles framing:
+  - The product problem is review memory, not rich-text YAML.
+  - The direct path is a visual annotation overlay on top of the existing plain-text editor.
+  - From zero, generated script content and reviewer annotations should be separate layers; this keeps export clean and avoids schema churn.
 
 ## 2026-06-06 PR9 Execution Plan
 

@@ -556,3 +556,106 @@
   - Updated `task_plan.md` to Phase 6 and recorded PR11.1 completion/merge.
 - Validation:
   - Stale branch/current-rule scan: cleaned root docs; remaining branch names only exist in historical progress/findings records.
+
+## Session: 2026-06-07 Phase 6 PR12 Execution
+
+### PR12: reading modes and scene marks
+- **Status:** complete
+- Actions taken:
+  - Restored `task_plan.md`, `findings.md`, and `progress.md` with the planning-with-files workflow.
+  - Ran session catchup; unsynced context only repeated old initialization messages and does not change PR12 scope.
+  - Confirmed working tree was clean on `master`.
+  - Tried branch `codex/phase-6-pr12-reading-mode`; nested ref creation failed in this Windows workspace.
+  - Created branch `codex-phase-6-pr12-reading-mode` with elevated Git permission.
+  - Recorded PR12 first-principles scope in `task_plan.md` and `findings.md`.
+  - Added reusable `ReadingControls.vue` for compare-page light/dark eye-care mode and reading size controls.
+  - Added reusable `SceneMarkControls.vue` and shared `frontend/src/types/review.ts`.
+  - Extended `SceneNavigator.vue` to render scene mark badges from props.
+  - Wired `ComparePage.vue` to persist reading preferences globally and scene marks per task in local storage.
+  - Updated compare-page styles for scoped reader variables, dark mode, source/draft text sizing, mark badges, and mobile toolbar layout.
+  - Updated `CODEX.md` with the new `frontend/src/types/` directory convention.
+  - Added YAML draft color marking as a follow-up: selected text can be marked red/orange/yellow/green/blue through a reusable highlight editor.
+  - Kept YAML color marks in local browser storage per task so the downloaded script text remains unchanged.
+- Current scope:
+  - Add reusable frontend components for reading appearance and scene marking.
+  - Persist reading preferences and scene marks locally.
+  - Keep backend APIs, conversion flow, YAML schema, and act grouping unchanged.
+- Errors:
+  - `rg --files` is denied in this environment; using PowerShell file listing and Node file reads.
+  - Normal nested `codex/...` branch creation failed; using the flat branch name consistent with earlier Windows PRs.
+- Validation:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+### PR12 hand-test feedback: YAML color marking menu
+- **Status:** fixed
+- User reported:
+  - Color menu opens, but selected content is covered.
+  - Selecting a color does not visibly change the draft.
+  - Clicking the `x` button does not close the color menu.
+- Root cause:
+  - `.compare-pane .yaml-editor` overrode the transparent textarea styling, so the input layer covered the mirror highlight layer.
+  - The selection stayed expanded after applying a color, so browser selection paint kept covering the new visual mark.
+  - `selectionchange` reopened the menu for the same selected range immediately after close.
+- Actions taken:
+  - Added dismissed-selection tracking in `YamlHighlightEditor.vue`.
+  - Collapsed the textarea selection after applying a highlight.
+  - Prevented menu mouse actions from stealing the textarea selection.
+  - Added a higher-specificity `.compare-pane .yaml-highlight-input` style so the textarea remains transparent and the mirror layer shows highlights.
+- Validation:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+### PR12 hand-test feedback: YAML selection and cursor alignment
+- **Status:** fixed
+- User reported:
+  - Selecting YAML text showed doubled/overlapped content.
+  - The text cursor could appear offset from the visible text.
+- Root cause:
+  - The first highlight editor implementation made both the textarea and mirror layer participate in visible text rendering. Even small differences in textarea and `pre` line wrapping, scrollbar width, or font rendering can make selection/cursor positions drift.
+- Action taken:
+  - Changed the highlight mirror layer to render only transparent text plus colored mark backgrounds.
+  - Restored textarea text rendering so the visible text, selection, and cursor are all from the browser's native textarea layer.
+- User impact:
+  - YAML editing remains stable and cursor-accurate.
+  - Color marks still appear as background highlights without relying on two visible text layers aligning perfectly.
+- Validation:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+### PR12 hand-test feedback: YAML typography
+- **Status:** fixed
+- User reported the YAML editor font felt inconsistent and visually rough.
+- Action taken:
+  - Added shared CSS font variables for app text and YAML surfaces.
+  - Changed YAML editor, YAML preview, and highlight editor layers from Cascadia/Consolas-first to the app's Chinese-friendly font stack.
+  - Increased YAML editor default size and line-height for long-form reading.
+- User impact:
+  - YAML draft now visually aligns with the rest of the compare page.
+  - Chinese script content no longer falls back into a code-font look during review.
+- Validation:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
+
+### PR12 hand-test feedback: Chinese YAML and highlight alignment
+- **Status:** fixed
+- User asked for YAML field names to be Chinese without affecting backend processing, and reported highlight background drift after typography changes.
+- Actions taken:
+  - Added compare-page display-layer YAML localization: backend English keys are shown as Chinese labels in the editor.
+  - Added reverse mapping before frontend validation and scene parsing, so backend/API/schema contracts remain unchanged.
+  - Localized beat type values in the editing surface: `dialogue/action/direction` display as `对白/动作/舞台指示`.
+  - Updated scene YAML block detection to support Chinese labels (`编号`, `来源章节`, `节拍`) while retaining English fallback.
+  - Added highlight range realignment from stored selected text so old marks recover after field-label or typography changes.
+  - Adjusted YAML font stack to a Chinese-friendly but stable stack shared by textarea and highlight layer.
+- User impact:
+  - The YAML editor is now Chinese-first for the target Chinese novel workflow.
+  - Backend result format and validation model stay stable.
+  - Existing local color marks no longer remain on unrelated text when layout/content shifts.
+- Validation:
+  - `node node_modules\vue-tsc\bin\vue-tsc.js --noEmit`: passed.
+  - `node node_modules\vite\bin\vite.js build`: passed.
+  - `git diff --check`: passed; only CRLF normalization warnings.
